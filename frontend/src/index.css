@@ -1,10 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Share+Tech+Mono&family=Fira+Code:wght@300;400;500;600;700&family=Orbitron:wght@400;500;700;900&family=DotGothic16&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Safe State (Default) */
+    /* Theme Obsidian (Default Safe State) */
     --threat-primary: #10b981;
     --threat-primary-rgb: 16, 185, 129;
     --threat-primary-glow: rgba(16, 185, 129, 0.12);
@@ -12,11 +14,21 @@
     --threat-bg-glow: rgba(16, 185, 129, 0.015);
     --cyber-bg: #030305;
     --cyber-border: rgba(255, 255, 255, 0.03);
-    --cyber-blue: #10b981; /* Shift primary accent to match state */
+    --cyber-blue: #10b981;
     --cyber-green: #10b981;
     --cyber-red: #ef4444;
     --cyber-amber: #f59e0b;
-    --cyber-purple: #10b981; /* Align UI colors to safe green standard */
+    --cyber-purple: #10b981;
+    --glass-bg: rgba(6, 6, 9, 0.72);
+    --glass-border: rgba(255, 255, 255, 0.03);
+    
+    --bg-glow-left: rgba(10, 10, 15, 0.95);
+    --bg-glow-right: rgba(15, 15, 22, 0.9);
+
+    /* Fonts & Vibe */
+    --theme-font: 'Inter', 'Outfit', sans-serif;
+    --theme-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    --panel-radius: 16px;
   }
 
   :root.threat-alert {
@@ -25,18 +37,163 @@
     --threat-primary-rgb: 239, 68, 68;
     --threat-primary-glow: rgba(239, 68, 68, 0.18);
     --threat-border: rgba(239, 68, 68, 0.28);
-    --threat-bg-glow: rgba(239, 68, 68, 0.03);
+    --threat-bg-glow: rgba(239, 68, 68, 0.035);
     --cyber-blue: #ef4444;
     --cyber-purple: #ef4444;
   }
 
+  /* Theme 2: Nebula Abyss (Cyber Purple / Space Orbitron) */
+  :root.theme-nebula {
+    --threat-primary: #8b5cf6; /* violet */
+    --threat-primary-rgb: 139, 92, 246;
+    --threat-primary-glow: rgba(139, 92, 246, 0.15);
+    --threat-border: rgba(139, 92, 246, 0.22);
+    --threat-bg-glow: rgba(217, 70, 239, 0.03);
+    --cyber-bg: #06030c;
+    --cyber-blue: #d946ef; /* magenta */
+    --cyber-green: #8b5cf6;
+    --cyber-purple: #d946ef;
+    --glass-bg: rgba(7, 4, 15, 0.74);
+    --glass-border: rgba(139, 92, 246, 0.08);
+
+    --bg-glow-left: rgba(18, 10, 32, 0.95);
+    --bg-glow-right: rgba(22, 10, 35, 0.9);
+
+    /* Dynamic Fonts & Shapes */
+    --theme-font: 'Orbitron', sans-serif;
+    --theme-font-mono: 'Space Grotesk', sans-serif;
+    --panel-radius: 28px; /* Extremely rounded spacecraft paneling */
+  }
+  :root.theme-nebula.threat-alert {
+    --threat-primary: #ec4899; /* hot pink */
+    --threat-primary-rgb: 236, 72, 153;
+    --threat-primary-glow: rgba(236, 72, 153, 0.2);
+    --threat-border: rgba(236, 72, 153, 0.3);
+    --threat-bg-glow: rgba(236, 72, 153, 0.04);
+    --cyber-bg: #0d0208;
+    --cyber-blue: #ec4899;
+    --cyber-green: #ec4899;
+    --cyber-purple: #ec4899;
+    --glass-bg: rgba(13, 2, 8, 0.75);
+    --glass-border: rgba(236, 72, 153, 0.12);
+  }
+
+  /* Theme 3: Crimson Protocol (Raw Share Tech Hacker Blocky) */
+  :root.theme-crimson {
+    --threat-primary: #ef4444; /* crimson */
+    --threat-primary-rgb: 239, 68, 68;
+    --threat-primary-glow: rgba(239, 68, 68, 0.15);
+    --threat-border: rgba(239, 68, 68, 0.22);
+    --threat-bg-glow: rgba(244, 63, 94, 0.03); /* rose glow */
+    --cyber-bg: #090204;
+    --cyber-blue: #f43f5e; /* rose */
+    --cyber-green: #ef4444;
+    --cyber-purple: #f43f5e;
+    --glass-bg: rgba(9, 2, 4, 0.74);
+    --glass-border: rgba(239, 68, 68, 0.08);
+
+    --bg-glow-left: rgba(24, 6, 12, 0.95);
+    --bg-glow-right: rgba(28, 6, 15, 0.9);
+
+    /* Dynamic Fonts & Shapes */
+    --theme-font: 'Share Tech Mono', monospace;
+    --theme-font-mono: 'Share Tech Mono', monospace;
+    --panel-radius: 0px; /* Sharp grid hardware console */
+  }
+  :root.theme-crimson.threat-alert {
+    --threat-primary: #f43f5e;
+    --threat-primary-rgb: 244, 63, 94;
+    --threat-primary-glow: rgba(244, 63, 94, 0.2);
+    --threat-border: rgba(244, 63, 94, 0.3);
+    --threat-bg-glow: rgba(244, 63, 94, 0.04);
+    --cyber-bg: #100205;
+    --cyber-blue: #f43f5e;
+    --cyber-green: #f43f5e;
+    --cyber-purple: #f43f5e;
+    --glass-bg: rgba(16, 2, 5, 0.75);
+    --glass-border: rgba(244, 63, 94, 0.12);
+  }
+
+  /* Theme 4: Matrix Code (Monochrome Retro DotGothic) */
+  :root.theme-matrix {
+    --threat-primary: #39ff14;
+    --threat-primary-rgb: 57, 255, 20;
+    --threat-primary-glow: rgba(57, 255, 20, 0.15);
+    --threat-border: rgba(57, 255, 20, 0.24);
+    --threat-bg-glow: rgba(57, 255, 20, 0.02);
+    --cyber-bg: #010602;
+    --cyber-blue: #39ff14;
+    --cyber-green: #39ff14;
+    --cyber-purple: #39ff14;
+    --glass-bg: rgba(2, 8, 3, 0.75);
+    --glass-border: rgba(57, 255, 20, 0.08);
+
+    --bg-glow-left: rgba(4, 12, 6, 0.95);
+    --bg-glow-right: rgba(6, 16, 8, 0.9);
+
+    /* Dynamic Fonts & Shapes */
+    --theme-font: 'DotGothic16', sans-serif;
+    --theme-font-mono: 'DotGothic16', monospace;
+    --panel-radius: 4px; /* Slight retro rounded corners */
+  }
+  :root.theme-matrix.threat-alert {
+    --threat-primary: #ff3300; /* emergency red-orange */
+    --threat-primary-rgb: 255, 51, 0;
+    --threat-primary-glow: rgba(255, 51, 0, 0.2);
+    --threat-border: rgba(255, 51, 0, 0.32);
+    --threat-bg-glow: rgba(255, 51, 0, 0.045);
+    --cyber-bg: #120301;
+    --cyber-blue: #ff3300;
+    --cyber-green: #ff3300;
+    --cyber-purple: #ff3300;
+    --glass-bg: rgba(18, 3, 1, 0.78);
+    --glass-border: rgba(255, 51, 0, 0.12);
+  }
+
+  /* Theme 5: Solar Flare (Aerospace Technical Fira Mono) */
+  :root.theme-amber {
+    --threat-primary: #f59e0b;
+    --threat-primary-rgb: 245, 158, 11;
+    --threat-primary-glow: rgba(245, 158, 11, 0.12);
+    --threat-border: rgba(245, 158, 11, 0.2);
+    --threat-bg-glow: rgba(245, 158, 11, 0.015);
+    --cyber-bg: #080501;
+    --cyber-blue: #f97316;
+    --cyber-green: #f59e0b;
+    --cyber-purple: #f59e0b;
+    --glass-bg: rgba(10, 7, 2, 0.72);
+    --glass-border: rgba(245, 158, 11, 0.07);
+
+    --bg-glow-left: rgba(14, 10, 4, 0.95);
+    --bg-glow-right: rgba(18, 12, 5, 0.9);
+
+    /* Dynamic Fonts & Shapes */
+    --theme-font: 'Fira Code', monospace;
+    --theme-font-mono: 'Fira Code', monospace;
+    --panel-radius: 8px; /* Classic structural container */
+  }
+  :root.theme-amber.threat-alert {
+    --threat-primary: #ef4444;
+    --threat-primary-rgb: 239, 68, 68;
+    --threat-primary-glow: rgba(239, 68, 68, 0.18);
+    --threat-border: rgba(239, 68, 68, 0.28);
+    --threat-bg-glow: rgba(239, 68, 68, 0.035);
+    --cyber-bg: #100202;
+    --cyber-blue: #ef4444;
+    --cyber-green: #ef4444;
+    --cyber-purple: #ef4444;
+    --glass-bg: rgba(16, 2, 2, 0.76);
+    --glass-border: rgba(239, 68, 68, 0.12);
+  }
+
   body {
-    @apply bg-cyber-bg text-gray-200 antialiased font-sans overflow-x-hidden selection:bg-white/10;
-    transition: background-image 0.5s ease;
+    font-family: var(--theme-font), sans-serif;
+    @apply bg-cyber-bg text-gray-200 antialiased overflow-x-hidden selection:bg-white/10;
+    transition: background-color 0.5s ease, font-family 0.5s ease;
     background-image: 
-      radial-gradient(at 0% 0%, rgba(10, 10, 15, 0.95) 0, transparent 55%),
+      radial-gradient(at 0% 0%, var(--bg-glow-left) 0, transparent 55%),
       radial-gradient(at 50% 0%, var(--threat-bg-glow) 0, transparent 65%),
-      radial-gradient(at 100% 0%, rgba(15, 15, 22, 0.9) 0, transparent 50%),
+      radial-gradient(at 100% 0%, var(--bg-glow-right) 0, transparent 50%),
       radial-gradient(at 50% 100%, #020203 0, #050608 100%);
   }
 
@@ -57,14 +214,27 @@
   }
 }
 
-/* Premium Glassmorphic Layouts */
+/* Base Glassmorphic Layouts */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--panel-radius) !important;
+  transition: background-color 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease, border-radius 0.5s ease;
+}
+
+.font-mono {
+  font-family: var(--theme-font-mono), 'Fira Code', monospace !important;
+}
+
 .neon-grid {
   position: absolute;
   inset: 0;
   background: repeating-linear-gradient(
     45deg,
-    rgba(255,255,255,0.02) 0px,
-    rgba(255,255,255,0.02) 2px,
+    rgba(255,255,255,0.015) 0px,
+    rgba(255,255,255,0.015) 2px,
     transparent 2px,
     transparent 4px
   );
@@ -91,10 +261,40 @@
   box-shadow: 0 0 25px rgba(var(--threat-primary-rgb), 0.08);
 }
 
+/* Background Glowing Float Animations */
+@keyframes blobFloat1 {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(40px, -60px) scale(1.15); }
+  66% { transform: translate(-30px, 30px) scale(0.9); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+@keyframes blobFloat2 {
+  0% { transform: translate(0px, 0px) scale(1); }
+  50% { transform: translate(-50px, 50px) scale(1.1); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+@keyframes blobFloat3 {
+  0% { transform: translate(0px, 0px) scale(1); }
+  40% { transform: translate(60px, -30px) scale(0.85); }
+  80% { transform: translate(-40px, 40px) scale(1.15); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+.animate-blob-float-1 {
+  animation: blobFloat1 25s infinite ease-in-out;
+}
+.animate-blob-float-2 {
+  animation: blobFloat2 30s infinite ease-in-out;
+}
+.animate-blob-float-3 {
+  animation: blobFloat3 22s infinite ease-in-out;
+}
+
 /* Code Syntax Styling for Terminal / Postmortem */
 .code-terminal {
   background: rgba(4, 6, 10, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: calc(var(--panel-radius) * 0.75) !important;
 }
 
 /* Dynamic Alert/Radar Grid Overlay */
@@ -126,15 +326,9 @@
 }
 
 @keyframes scanner {
-  0% {
-    top: 0%;
-  }
-  50% {
-    top: 100%;
-  }
-  100% {
-    top: 0%;
-  }
+  0% { top: 0%; }
+  50% { top: 100%; }
+  100% { top: 0%; }
 }
 
 .animate-scanner {
@@ -229,4 +423,3 @@
   animation-duration: 4.2s;
   animation-delay: 1.5s;
 }
-

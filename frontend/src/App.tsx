@@ -18,14 +18,15 @@ import {
   Mic,
   MicOff,
   Volume2,
-  VolumeX
+  VolumeX,
+  Palette
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { interpretVoice, askLLM } from "@/lib/assistant";
+
 import { LimelightNav } from "@/components/ui/limelight-nav";
 import { PixelLogoGrid } from "@/components/ui/pixel-logo-grid";
 import { CpuArchitecture } from "@/components/ui/cpu-architecture";
-import { SreBrain3d } from "@/components/ui/sre-brain-3d";
+import { SwarmAgentNetwork } from "@/components/ui/swarm-agent-network";
 import { SreRobot3d } from "@/components/ui/sre-robot-3d";
 import { Spotlight } from "@/components/ui/spotlight";
 
@@ -97,6 +98,24 @@ export default function App() {
 
   // Navigation index
   const [activeNavIndex, setActiveNavIndex] = useState(0);
+
+  // Theme state and sync persistence
+  const [theme, setTheme] = useState<"obsidian" | "nebula" | "crimson" | "matrix" | "amber">(() => {
+    const saved = localStorage.getItem("sentinelops-theme");
+    return (saved === "obsidian" || saved === "nebula" || saved === "crimson" || saved === "matrix" || saved === "amber") ? saved : "obsidian";
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.remove(
+      "theme-obsidian",
+      "theme-nebula",
+      "theme-crimson",
+      "theme-matrix",
+      "theme-amber"
+    );
+    document.documentElement.classList.add(`theme-${theme}`);
+    localStorage.setItem("sentinelops-theme", theme);
+  }, [theme]);
 
   // Refs for auto-scroll
   const logTerminalRef = useRef<HTMLDivElement>(null);
@@ -203,6 +222,16 @@ export default function App() {
   };
 
   // Voice Command Listener Initialization
+  const processVoiceCommandRef = useRef(processVoiceCommand);
+  useEffect(() => {
+    processVoiceCommandRef.current = processVoiceCommand;
+  }, [processVoiceCommand]);
+
+  const isListeningRef = useRef(isListening);
+  useEffect(() => {
+    isListeningRef.current = isListening;
+  }, [isListening]);
+
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -215,7 +244,7 @@ export default function App() {
         const resultIndex = event.resultIndex;
         const transcript = event.results[resultIndex][0].transcript.trim().toLowerCase();
         setVoiceTextLog(`Detected command: "${transcript}"`);
-        processVoiceCommand(transcript);
+        processVoiceCommandRef.current(transcript);
       };
 
       rec.onerror = (e: any) => {
@@ -224,14 +253,135 @@ export default function App() {
       };
 
       rec.onend = () => {
-        setIsListening(false);
+        if (isListeningRef.current) {
+          try {
+            rec.start();
+          } catch (e) {
+            // Already listening
+          }
+        } else {
+          setIsListening(false);
+        }
       };
 
       recognitionRef.current = rec;
     } else {
       setVoiceTextLog("Speech recognition not supported in this browser.");
     }
-  }, [incidents, selectedIncidentId, activeIncident]);
+  }, []);
+
+  // Background sound activation (claps and wake phrases)
+  const triggerSentinelUplink = (msg: string) => {
+    setIsListening(true);
+    setVoiceTextLog(msg);
+    speakText("Vocal uplink established. Sentinel stands ready.");
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.start();
+      } catch (e) {
+        // already listening
+      }
+    }
+  };
+
+  useEffect(() => {
+    let audioContext: AudioContext | null = null;
+    let analyser: AnalyserNode | null = null;
+    let microphone: MediaStreamAudioSourceNode | null = null;
+    let javascriptNode: ScriptProcessorNode | null = null;
+    let stream: MediaStream | null = null;
+    let wakeRec: any = null;
+
+    const setupAudioMonitoring = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+
+        // Setup wake word listener
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (SpeechRecognition) {
+          wakeRec = new SpeechRecognition();
+          wakeRec.continuous = true;
+          wakeRec.interimResults = true;
+          wakeRec.lang = "en-US";
+
+          wakeRec.onresult = (event: any) => {
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+              const transcript = event.results[i][0].transcript.trim().toLowerCase();
+              if (transcript.includes("sentinel activate") || transcript.includes("sentinel online") || transcript.includes("sentinel")) {
+                triggerSentinelUplink("Sentinel wake word detected. Uplink established.");
+                break;
+              }
+            }
+          };
+
+          wakeRec.onend = () => {
+            try {
+              wakeRec.start();
+            } catch (e) {
+              // already listening
+            }
+          };
+
+          wakeRec.start();
+        }
+
+        // Setup clap/snap spike detection
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        audioContext = new AudioContextClass();
+        analyser = audioContext.createAnalyser();
+        microphone = audioContext.createMediaStreamSource(stream);
+        javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
+
+        analyser.smoothingTimeConstant = 0.3;
+        analyser.fftSize = 1024;
+
+        microphone.connect(analyser);
+        analyser.connect(javascriptNode);
+        javascriptNode.connect(audioContext.destination);
+
+        let lastPeakTime = 0;
+        javascriptNode.onaudioprocess = () => {
+          if (!analyser) return;
+          const array = new Uint8Array(analyser.frequencyBinCount);
+          analyser.getByteFrequencyData(array);
+          let values = 0;
+
+          const length = array.length;
+          for (let i = 0; i < length; i++) {
+            values += array[i];
+          }
+
+          const average = values / length;
+          // Sharp sound trigger threshold (claps)
+          if (average > 85) {
+            const now = Date.now();
+            if (now - lastPeakTime > 1200) {
+              lastPeakTime = now;
+              triggerSentinelUplink("Audio clap peak detected. Swarm uplink online.");
+            }
+          }
+        };
+
+      } catch (err) {
+        console.warn("Audio background monitor initialization failed:", err);
+      }
+    };
+
+    setupAudioMonitoring();
+
+    return () => {
+      if (wakeRec) {
+        wakeRec.onend = null;
+        wakeRec.stop();
+      }
+      if (javascriptNode) javascriptNode.disconnect();
+      if (microphone) microphone.disconnect();
+      if (audioContext) audioContext.close();
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
 
   // Toggle Voice Recognition
   const toggleListening = () => {
@@ -253,7 +403,7 @@ export default function App() {
   };
 
   // Process SRE Audio Voice commands
-  const processVoiceCommand = (command: string) => {
+  function processVoiceCommand(command: string) {
     if (command.includes("inject") || command.includes("trigger") || command.includes("crash")) {
       if (activeIncident) {
         speakText("Fault profile already active. Remediate active outage first.");
@@ -320,7 +470,7 @@ export default function App() {
           ...prev,
           {
             agent: "Orchestrator Node",
-            message: "⚠️ Remediator node triggered. Cluster reboot in progress. Configuration parameters rolled back.",
+            message: "[ALERT] Remediator node triggered. Cluster reboot in progress. Configuration parameters rolled back.",
             timestamp: new Date().toLocaleTimeString()
           }
         ]);
@@ -409,7 +559,14 @@ export default function App() {
   ];
 
   return (
-    <div className="h-screen w-screen grid-bg p-4 flex flex-col gap-4 text-[14.5px] transition-colors duration-500 selection:bg-white/10 overflow-hidden">
+    <div className="h-screen w-screen grid-bg p-4 flex flex-col gap-4 text-[14.5px] transition-colors duration-500 selection:bg-white/10 overflow-hidden relative">
+      
+      {/* Dynamic Background Glowing Orbs for theme aesthetics */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[var(--threat-primary)]/10 blur-[130px] animate-blob-float-1"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full bg-[var(--cyber-blue)]/5 blur-[150px] animate-blob-float-2"></div>
+        <div className="absolute top-[30%] right-[20%] w-[40%] h-[40%] rounded-full bg-[var(--threat-bg-glow)]/40 blur-[110px] animate-blob-float-3"></div>
+      </div>
       
       {/* 🚀 Header SRE Command Center */}
       <header className={cn(
@@ -436,6 +593,54 @@ export default function App() {
 
         {/* Dynamic Alarm Header Status */}
         <div className="flex items-center gap-4 w-full md:w-auto justify-end">
+          {/* Sleek Theme Selector Pills */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/40 border border-white/[0.04] relative z-20">
+            <Palette className="h-3.5 w-3.5 text-gray-400" />
+            <span className="text-[9px] text-gray-500 font-mono tracking-wider uppercase mr-1">Theme</span>
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => setTheme("obsidian")}
+                title="Cyber Obsidian (Green)"
+                className={cn(
+                  "w-4 h-4 rounded-full bg-[#030305] border transition-all cursor-pointer",
+                  theme === "obsidian" ? "border-cyber-green scale-110 shadow-lg shadow-cyber-green/30" : "border-zinc-700 hover:border-zinc-500"
+                )}
+              />
+              <button
+                onClick={() => setTheme("nebula")}
+                title="Nebula Violet (Magenta/Purple)"
+                className={cn(
+                  "w-4 h-4 rounded-full bg-[#06030c] border transition-all cursor-pointer",
+                  theme === "nebula" ? "border-[#a855f7] scale-110 shadow-lg shadow-[#a855f7]/30" : "border-zinc-700 hover:border-zinc-500"
+                )}
+              />
+              <button
+                onClick={() => setTheme("crimson")}
+                title="Crimson Protocol (Rose/Maroon)"
+                className={cn(
+                  "w-4 h-4 rounded-full bg-[#090204] border transition-all cursor-pointer",
+                  theme === "crimson" ? "border-[#f43f5e] scale-110 shadow-lg shadow-[#f43f5e]/30" : "border-zinc-700 hover:border-zinc-500"
+                )}
+              />
+              <button
+                onClick={() => setTheme("matrix")}
+                title="Matrix Code (Lime Green)"
+                className={cn(
+                  "w-4 h-4 rounded-full bg-[#010602] border transition-all cursor-pointer",
+                  theme === "matrix" ? "border-[#39ff14] scale-110 shadow-lg shadow-[#39ff14]/30" : "border-zinc-700 hover:border-zinc-500"
+                )}
+              />
+              <button
+                onClick={() => setTheme("amber")}
+                title="Solar Flare (Amber/Gold)"
+                className={cn(
+                  "w-4 h-4 rounded-full bg-[#080501] border transition-all cursor-pointer",
+                  theme === "amber" ? "border-[#f59e0b] scale-110 shadow-lg shadow-[#f59e0b]/30" : "border-zinc-700 hover:border-zinc-500"
+                )}
+              />
+            </div>
+          </div>
+
           {activeIncident ? (
             <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-cyber-red/10 border border-cyber-red/35 text-cyber-red animate-pulse shadow-lg shadow-cyber-red/5">
               <AlertTriangle className="h-4 w-4" />
@@ -680,20 +885,11 @@ export default function App() {
           <div className="glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden group flex-shrink-0">
             <Spotlight size={300} />
             <h2 className="text-xs font-semibold tracking-widest text-white border-b border-white/[0.04] pb-2 flex items-center gap-2 uppercase font-mono relative z-10">
-              <Network className="h-4 w-4 text-cyber-green" /> Cybernetic Topology Swarm
+              <Network className="h-4 w-4 text-cyber-green" /> Cybernetic Swarm Agent Network
             </h2>
 
-            <div className="relative h-64 rounded-xl border border-white/[0.04] overflow-hidden z-10">
-              {/* Overhauled interactive 360-degree drag brain */}
-              <SreBrain3d className="absolute inset-0 w-full h-full" isThreat={!!activeIncident} />
-
-              {/* Active Agent node correlations tag */}
-              {swarmStatus === "running" && activeAgentName !== "none" && (
-                <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-[#050508]/90 border border-white/[0.08] rounded-xl px-3 py-1.5 text-xs animate-pulse">
-                  <div className="h-2 w-2 rounded-full bg-cyber-green animate-ping"></div>
-                  <span className="text-gray-400 font-mono">Cognitive solver: <strong className="text-white">{activeAgentName}</strong></span>
-                </div>
-              )}
+            <div className="relative z-10">
+              <SwarmAgentNetwork isThreat={!!activeIncident} activeAgentName={activeAgentName} />
             </div>
           </div>
 

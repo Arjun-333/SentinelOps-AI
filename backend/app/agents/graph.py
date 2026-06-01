@@ -273,10 +273,10 @@ def resolution_node(state: AgentSwarmState) -> AgentSwarmState:
 
 ---
 
-### 🚨 1. Outage Summary & Impact
+### 1. Outage Summary & Impact
 Under production load, `payment-service` experienced full API blockage. The 99th percentile API response times surged from 45ms to **15,000ms**, triggering downstream timeout cascading (504 Gateway Timeouts) at the API Gateway. The payment processor returned 100% transaction failure rates, blocking checkout options.
 
-### 🔍 2. Root Cause Analysis (RCA)
+### 2. Root Cause Analysis (RCA)
 Our Root Cause swarm traced the failure directly to **Commit 8f3c7e2** ('*fix: batch process payments in parallel threadpool*').
 The commit added a parallel multithreaded worker pipeline. However:
 ```python
@@ -288,15 +288,15 @@ def run_in_thread(pay):
 ```
 Every batch payment run allocated thread-level database pools that were never released. This led to complete Hikari Pool connection starvation within 1 minute of deployment.
 
-### 📚 3. Historical Correlation & RAG Retrieval
+### 3. Historical Correlation & RAG Retrieval
 The Retrieval Agent matched the failure against **Incident #892 (Payment Threadpool Leak)**. The historical guide explicitly details similar HikariPool starvation in thread pools where manual exceptions or missing teardown closures bypassed connection cleanup.
 
-### 🛠️ 4. Immediate Remediation Actions
+### 4. Immediate Remediation Actions
 1. **Triggered roll-back** of `payment-service` to image version `v1.8.1` (commit `8f3c7e2` reversion), which restores normal connection behaviors.
 2. **Killed active orphaned database locks** inside the PostgreSQL database pool.
 3. Successfully restored transaction latency to **42ms**.
 
-### 🛡️ 5. Long-term Prevention & Monitoring
+### 5. Long-term Prevention & Monitoring
 1. Enforce strict linter configurations rejecting connection acquisitions outside of `with` resource manager blocks.
 2. Implement a Prometheus alert trigger that fires when connection utilization surpasses **85%** of pool limits for longer than 30 seconds.
 """
@@ -317,10 +317,10 @@ The Retrieval Agent matched the failure against **Incident #892 (Payment Threadp
 
 ---
 
-### 🚨 1. Outage Summary & Impact
+### 1. Outage Summary & Impact
 Auth-service experienced sudden process terminations, showing typical `CrashLoopBackOff` in Kubernetes nodes due to cgroup limit enforcement (ExitCode 137, OOMKilled). Response times grew from 25ms to **320ms** before pod failure, blocking login validation for incoming users.
 
-### 🔍 2. Root Cause Analysis (RCA)
+### 2. Root Cause Analysis (RCA)
 Root cause isolated to **Commit 3f9c2d1** ('*feat: cache user JWT permissions in-memory for speed*').
 A global dictionary cache `tokenCache` was declared in Node.js runtime memory:
 ```javascript
@@ -332,15 +332,15 @@ function cacheToken(token, userPayload) {
 ```
 High transaction frequency resulted in thousands of token values accumulating in memory, provoking V8 heap exhaustion.
 
-### 📚 3. Historical Correlation & RAG Retrieval
+### 3. Historical Correlation & RAG Retrieval
 The Retrieval Agent matched the memory pattern to **Incident #412 (Session Storage Auth OOM)**, which documented a nearly identical problem with unbounded session objects.
 
-### 🛠️ 4. Immediate Remediation Actions
+### 4. Immediate Remediation Actions
 1. Re-routed traffic and **restarted active auth-service containers** to reclaim heap capacity.
 2. **Reverted deployment** back to v2.4.0 (removing local RAM caching).
 3. Session validation error rates successfully returned to **0.0%**.
 
-### 🛡️ 5. Long-term Prevention & Monitoring
+### 5. Long-term Prevention & Monitoring
 1. Enforce strict boundaries preventing Node applications from saving persistent transaction state in local RAM variables.
 2. Set CPU/Memory alerts with Prometheus node-exporter to trigger notification channels at 80% RAM utilization.
 """
@@ -361,22 +361,22 @@ The Retrieval Agent matched the memory pattern to **Incident #412 (Session Stora
 
 ---
 
-### 🚨 1. Outage Summary & Impact
+### 1. Outage Summary & Impact
 API Gateway logged persistent 504 read timeouts on routes bound to `/api/v1/users`. Downstream requests were blocked completely for all user profile actions, resulting in **100% gateway error rates** on that route.
 
-### 🔍 2. Root Cause Analysis (RCA)
+### 2. Root Cause Analysis (RCA)
 Root cause traced to **Commit 4d8b122** ('*refactor: upgrade upstream network connection timeouts*').
 Nginx configuration was updated to route traffic to `user-service-internal.prod.svc.cluster.local:8080`. This local DNS hostname is not registered in the cluster registry or resides in a blocked namespace, causing connection requests to time out (30s) during Nginx DNS resolution.
 
-### 📚 3. Historical Correlation & RAG Retrieval
+### 3. Historical Correlation & RAG Retrieval
 Retrieval search pulled **RUNBOOK_K8S_DNS (Kubernetes DNS and Upstream timeouts)**, pointing out that service endpoint mapping errors usually root in mismatched DNS mappings between local clusters and config specs.
 
-### 🛠️ 4. Immediate Remediation Actions
+### 4. Immediate Remediation Actions
 1. **Reverted Nginx upstream configuration** back to target the valid endpoint `http://user-service:8080`.
 2. **Reloaded API gateway configuration** without dropping existing active connections.
 3. Latency was restored to healthy baseline of **15ms**.
 
-### 🛡️ 5. Long-term Prevention & Monitoring
+### 5. Long-term Prevention & Monitoring
 1. Integrate automatic validation of Nginx config DNS schemas inside deployment CI/CD verification stages.
 2. Monitor DNS query resolution failures from Nginx upstream blocks.
 """
@@ -397,10 +397,10 @@ Retrieval search pulled **RUNBOOK_K8S_DNS (Kubernetes DNS and Upstream timeouts)
 
 ---
 
-### 🚨 1. Outage Summary & Impact
+### 1. Outage Summary & Impact
 The notification-service went offline immediately after deployment. Container pods entered a persistent `CrashLoopBackOff` state, exiting on start with ExitCode 1. Downstream services were unable to send transactional notices (SMS, Emails), blocking transaction confirmations.
 
-### 🔍 2. Root Cause Analysis (RCA)
+### 2. Root Cause Analysis (RCA)
 Our AI swarm tracked the failure to **Commit 7a8b9c0** ('*feat: introduce redis rate-limiter for notifications*').
 The commit added a Redis lookup dependency but transitioned from a safe fallback query `os.getenv` to a strict lookup assertion:
 ```python
@@ -409,15 +409,15 @@ redis_url = os.environ['REDIS_URL']
 ```
 Because the production ConfigMaps and Helm values files did not specify `REDIS_URL`, the application crashed immediately on startup.
 
-### 📚 3. Historical Correlation & RAG Retrieval
+### 3. Historical Correlation & RAG Retrieval
 The RCA agent identified this as a clear configuration discrepancy. The standard runbook **RUNBOOK_ENV_CONFIG** was utilized to verify configuration sync procedures.
 
-### 🛠️ 4. Immediate Remediation Actions
+### 4. Immediate Remediation Actions
 1. **Patched notification-service Kubernetes deployment** in the namespace, injecting the active environment variable `REDIS_URL` mapping to redis server endpoints.
 2. **Applied rolling restart** of the pod replicas.
 3. Notification service successfully booted and reached **Ready status**.
 
-### 🛡️ 5. Long-term Prevention & Monitoring
+### 5. Long-term Prevention & Monitoring
 1. Implement runtime verification checks that compile configuration environments before starting core application threads.
 2. Prevent CI/CD deployments from executing if newly committed environment keys are omitted from deployment target values.
 """
@@ -438,10 +438,10 @@ The RCA agent identified this as a clear configuration discrepancy. The standard
 
 ---
 
-### 🚨 1. Outage Summary & Impact
+### 1. Outage Summary & Impact
 Disk capacity on Node k8s-node-3 reached **99.8%**, triggering a Kubernetes DiskPressure warning. The audit-logger-service failed to write logs (`IOError: No space left on device`), blocking database write operations and stalling raw transactional audit lines.
 
-### 🔍 2. Root Cause Analysis (RCA)
+### 2. Root Cause Analysis (RCA)
 Root cause traced to **Commit 9d8e7c6** ('*debug: set log severity level to DEBUG to trace local database connections*').
 To debug an issue, the developer committed:
 ```python
@@ -450,15 +450,15 @@ LOG_ROTATE = False # Disable rotation to secure full database outputs
 ```
 Under production workload, this flooded the `/var/log/audit.log` file with heavy payload logs, consuming 50GB within minutes and filling the volume capacity.
 
-### 📚 3. Historical Correlation & RAG Retrieval
+### 3. Historical Correlation & RAG Retrieval
 Retrieval Agent found SRE guideline **RUNBOOK_DISK_FULL**, validating that debugging log spikes without rotation are the prime cause of node volume exhaustion.
 
-### 🛠️ 4. Immediate Remediation Actions
+### 4. Immediate Remediation Actions
 1. **Truncated raw log file** instantly on host shell: `echo > /var/log/audit.log` freeing disk partition space.
 2. **Rolled back configuration changes**, resetting log level back to `INFO` and re-activating `LOG_ROTATE = True`.
 3. Node disk usage successfully dropped to **41%**.
 
-### 🛡️ 5. Long-term Prevention & Monitoring
+### 5. Long-term Prevention & Monitoring
 1. Set strict disk boundaries enforcing logrotate limits on all microservice audit outputs.
 2. Implement safety checks that auto-expire raw logging levels set to DEBUG after 24 hours.
 """

@@ -1,10 +1,10 @@
-# SentinelOps AI – Multi-Agent DevOps Incident Response Swarm
+# SentinelOps AI - Multi-Agent DevOps Incident Response Swarm
 
-SentinelOps AI is a next-generation, autonomous SRE and DevOps incident response platform. Built on an **Agent Swarm architecture** using **LangGraph**, it acts as an intelligent, automated operations team. When system anomalies or deployment failures arise, the orchestrator triggers specialized AI agents that collaborate in parallel, retrieve context from internal SRE runbooks, isolate the root cause code commits, apply patches, and auto-compile standard Markdown incident postmortems.
+SentinelOps AI is an enterprise-grade, autonomous SRE (Site Reliability Engineering) and DevOps incident response platform. Built on an agent swarm architecture using LangGraph, it orchestrates specialized AI nodes to detect anomalies, query RAG databases for runbooks, investigate git commit histories, execute remediation plans, and generate production-ready Markdown postmortem reports.
 
 ---
 
-##  System Architecture & Workflow
+## System Architecture and Workflow
 
 ```
 [OUTAGE INJECTED]
@@ -14,50 +14,76 @@ SentinelOps AI is a next-generation, autonomous SRE and DevOps incident response
  │   Incident    ├────────────────────────────────────────┐
  │   Simulator   │                                        │
  └───────────────┘                                        ▼
-                                                ┌───────────────────┐
-                                                │ Monitoring Agent  │
-                                                └─────────┬─────────┘
-                                                          │ (Anomalous Service Isolated)
-                                                          ▼
-                                                ┌───────────────────┐
-                                                │     RCA Agent     │ ◄─── Reviews commits, diffs, & logs
-                                                └─────────┬─────────┘
-                                                          │
-                                            ┌─────────────┴─────────────┐
-                                            │ Is confidence > 80%?      │
-                                            ├─────────────┬─────────────┤
-                                            │ Yes         │ No          │
-                                            ▼             ▼             ▼
-                                    ┌──────────────┐     ┌──────────────┐
-                                    │ Resolution   │     │  Retrieval   │ ◄─── Pulls SRE runbooks & history
-                                    │    Agent     │     │    Agent     │
-                                    └──────┬───────┘     └──────┬───────┘
-                                           │                    │
-                                           │                    ▼
-                                           │             ┌──────────────┐
-                                           │             │   RCA Agent  │ (Re-evaluates with retrieved guides)
-                                           │             └──────┬───────┘
-                                           │                    │
-                                           ▼◄───────────────────┘
-                                    ┌──────────────┐
-                                    │  Postmortem  │
-                                    │    Agent     │ ◄─── Compiles Markdown SRE Incident Postmortem Report
-                                    └──────────────┘
+                                                 ┌───────────────────┐
+                                                 │ Monitoring Agent  │
+                                                 └─────────┬─────────┘
+                                                           │ (Anomalous Service Isolated)
+                                                           ▼
+                                                 ┌───────────────────┐
+                                                 │     RCA Agent     │ ◄─── Reviews commits, diffs, & logs
+                                                 └─────────┬─────────┘
+                                                           │
+                                             ┌─────────────┴─────────────┐
+                                             │ Is confidence > 80%?      │
+                                             ├─────────────┬─────────────┤
+                                             │ Yes         │ No          │
+                                             ▼             ▼             ▼
+                                     ┌──────────────┐     ┌──────────────┐
+                                     │ Resolution   │     │  Retrieval   │ ◄─── Pulls SRE runbooks & history
+                                     │    Agent     │     │    Agent     │
+                                     └──────┬───────┘     └──────┬───────┘
+                                            │                    │
+                                            │                    ▼
+                                            │             ┌──────────────┐
+                                            │             │   RCA Agent  │ (Re-evaluates with retrieved guides)
+                                            │             └──────┬───────┘
+                                            │                    │
+                                            ▼◄───────────────────┘
+                                     ┌──────────────┐
+                                     │  Postmortem  │
+                                     │    Agent     │ ◄─── Compiles Markdown SRE Incident Postmortem Report
+                                     └──────────────┘
 ```
 
 ---
 
-##  The Specialized Agent Swarm
+## Technical Features
 
-Our LangGraph network orchestrates four specialized agents to perform collaborative investigation:
-1. **Monitoring & Detection Agent**: Continuously parses dynamic telemetry streams and log records to identify anomalies and isolate the affected service.
-2. **Root Cause Analysis (RCA) Agent**: Examines error traces, container status parameters, and git repository deployment commits to locate the exact buggy line of code.
-3. **SRE RAG Retrieval Agent**: Leverages a local TF-IDF semantic database containing Kubernetes cheat sheets, database pool parameters, and past outage postmortems to supply historical recovery playbooks.
-4. **Postmortem & Resolution Agent**: Drafts step-by-step remediation plans and compiles an executive SRE postmortem report detailing the timeline and mitigation paths.
+### 1. Collaborative Agent Swarm
+Our LangGraph plexus orchestrates four specialized nodes for investigation and mitigation:
+- **Monitoring and Detection Agent**: Parses dynamic telemetry streams and log records to identify anomalies and isolate the affected microservice.
+- **Root Cause Analysis (RCA) Agent**: Examines system error traces, container environments, and git repository commits to isolate buggy lines.
+- **SRE RAG Retrieval Agent**: Queries a localized semantic vector store of past outages and Kubernetes cheat sheets to fetch relevant runbooks.
+- **Postmortem and Resolution Agent**: Formulates step-by-step remediation plans and compiles detailed incident reports.
+
+### 2. SVG Swarm Topology Plexus
+An interactive, high-fidelity SVG network topology graph replaces simple visualizations:
+- **Active Node Highlighting**: Connects directly to the backend SSE events to illuminate the executing agent node.
+- **Animated Data Packets**: Renders sliding packet elements flowing along connection vectors to illustrate system data paths.
+- **Dynamic Context Inspector**: Includes an interactive sidebar that displays CPU, memory, and functional specs when clicking nodes.
+
+### 3. Infinite Vocal Uplink & Sound Activation
+A secure, hands-free voice command system powered by Web Audio and Web Speech APIs:
+- **Clap Spike Trigger**: Uses Web Audio API analyser nodes to monitor sound slopes. A sharp clap or snap spikes volume and automatically powers the uplink.
+- **Wake Word Trigger**: Listens silently for the keyword "Sentinel Activate" or "Sentinel" to toggle listening.
+- **Persistent Connection**: Uses reference-state monitoring (`isListeningRef`) to automatically restart speech recognition on silence timeouts, ensuring an infinite hands-free link.
+- **SRE Action Parser**: Voice commands map directly to dashboard actions:
+  - *"Trigger incident" / "Inject fault"* -> Initiates random outage simulation.
+  - *"Deploy swarm" / "Analyze logs"* -> Spins up the LangGraph diagnostic team.
+  - *"Resolve outage" / "Rollback commit"* -> Reverts the bug and restores systems.
+  - *"Status check" / "Explain status"* -> Synthesizes vocal briefings.
+
+### 4. Dynamic Enterprise Theming Engine
+Provides five curated, state-of-the-art themes that persist via `localStorage` and dynamically transition background colors, highlighting colors, border-radius layouts, and font hierarchies:
+- **Cyber Obsidian (Default)**: Sleek green highlights, round borders, modern sans-serif fonts.
+- **Nebula Abyss**: Deep space violet/magenta hues, high rounded container headers, Orbitron sci-fi fonts.
+- **Crimson Protocol**: Cyber-alert rose/maroon shades, industrial sharp square panels, Share Tech Mono monospace fonts.
+- **Matrix Code**: Retro neon lime highlights, light technical borders, Japanese DotGothic grid styling.
+- **Solar Flare**: Aerospace technical amber/orange highlights, compact container sizing, Fira Code font stack.
 
 ---
 
-## ⚡ The Five Simulated Outages
+## Simulated Outages
 
 SentinelOps AI simulates real-world production crash scenarios to prove agent reasoning depth:
 1. **`DB_CONNECTION_EXHAUSTION` (Severity: CRITICAL)**: An unreleased database socket in `payment-service` threadpool workers starves Hikari connections, triggering 504 Gateway errors.
@@ -68,9 +94,9 @@ SentinelOps AI simulates real-world production crash scenarios to prove agent re
 
 ---
 
-##  Quickstart Guide
+## Quickstart Guide
 
-To boot up the SRE Command Center in your local development environment, follow these steps:
+To boot up the SRE Command Center in your local development environment:
 
 ### 1. Launch the FastAPI Backend
 Initialize the virtual environment and boot the Uvicorn server:
@@ -94,10 +120,6 @@ npm run dev
 
 ---
 
-##  Cybersecurity Aesthetics
+## Authorship and Credits
 
-SentinelOps AI is dressed in a **gorgeous cyberpunk SRE interface**:
-- **Frosted Glassmorphism**: Cards styled with dynamic backdrop filters (`backdrop-blur`) and thin borders that floatingly overlay our deep radial canvas grid.
-- **Pulsing Topology Map**: An interactive SVG representation of our LangGraph swarm that lights up and expands active nodes while streaming real-time thoughts.
-- **Live Metrics Panels**: Plotting real-time gauges representing RAM/CPU quotas and database thresholds with smooth animations.
-- **Rich Markdown Reader**: A formatted SRE review sheet that instantly compiles postmortem timelines and features single-click copying.
+Developed and maintained by **Arjun R**.
