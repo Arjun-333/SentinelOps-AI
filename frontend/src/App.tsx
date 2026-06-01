@@ -283,6 +283,13 @@ export default function App() {
 
       rec.onerror = (e: any) => {
         console.error("Speech Recognition Error", e);
+        if (e.error === "not-allowed") {
+          setVoiceTextLog("Mic permission denied. Use manual command input below.");
+        } else if (e.error === "network") {
+          setVoiceTextLog("Speech network fault. Use manual command input below.");
+        } else {
+          setVoiceTextLog(`Voice offline (${e.error}). Use manual command input.`);
+        }
       };
 
       rec.onend = () => {
@@ -749,6 +756,24 @@ export default function App() {
               <div className="p-3 bg-black/60 rounded-xl border border-white/[0.04] font-mono text-[11px] text-gray-400 leading-normal min-h-[56px] flex flex-col justify-center">
                 <span className="text-cyber-green font-bold text-[9px] uppercase tracking-wider block mb-1">Telemetry uplink log</span>
                 <span className="line-clamp-2">{voiceTextLog}</span>
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Type SRE instruction... (press Enter)"
+                  className="flex-1 bg-black/50 hover:bg-black/60 focus:bg-black/80 border border-white/[0.08] focus:border-cyber-green/40 text-gray-200 font-mono text-[11px] px-3 py-2.5 rounded-xl outline-none transition-all placeholder-zinc-600 shadow-inner"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const val = e.currentTarget.value.trim();
+                      if (val) {
+                        setVoiceTextLog(`Manual command: "${val}"`);
+                        processVoiceCommand(val);
+                        e.currentTarget.value = "";
+                      }
+                    }
+                  }}
+                />
               </div>
 
               <div className="flex gap-2">
