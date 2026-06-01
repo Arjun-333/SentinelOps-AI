@@ -411,9 +411,25 @@ export default function App() {
         speakText("Current status. Nominal parameters. Swarm is standing by.");
       }
     } else {
-      setVoiceTextLog(`Unmapped instruction: "${command}"`);
+      setVoiceTextLog("Querying operations intelligence...");
+      fetch("http://localhost:8000/assistant/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: command })
+      })
+        .then(res => res.json())
+        .then(data => {
+          const answer = data.answer || "Uplink online. Standing by.";
+          setVoiceTextLog(`Response: ${answer}`);
+          speakText(answer);
+        })
+        .catch(err => {
+          console.error("Failed to query assistant:", err);
+          setVoiceTextLog(`Connection fault. Parsed: "${command}"`);
+          speakText("Operations connection timed out.");
+        });
     }
-  };
+  }
 
   // Actions
   const handleTriggerIncident = () => {

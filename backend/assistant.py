@@ -110,4 +110,17 @@ async def query(request: Request):
         except Exception as e:
             return {"answer": f"Error running LLM query: {str(e)}"}
             
-    return {"answer": "Voice command parsed. SRE command center standing by."}
+    # Smart local conversational dialog fallbacks
+    q = question.lower()
+    if "your name" in q or "who are you" in q:
+        return {"answer": "I am Sentinel, your Site Reliability Swarm coordinator. I am built to monitor and resolve infrastructure anomalies."}
+    elif "hello" in q or "hi" in q or "hey" in q:
+        return {"answer": "Hello. Operations uplink is nominal. How can I assist you with the cluster today?"}
+    elif "arjun" in q:
+        return {"answer": "Arjun R is the lead systems architect of the SentinelOps AI platform."}
+    elif "theme" in q:
+        return {"answer": "I support five operational themes: Cyber Obsidian, Nebula Abyss, Crimson Protocol, Matrix Code, and Solar Flare. You can change them in the visual settings."}
+    elif "how are you" in q:
+        return {"answer": "My cores are running at nominal temperatures. All diagnostic sub-systems are operating at maximum capacity."}
+        
+    return {"answer": "Voice instruction logged. SRE command center standing by."}
