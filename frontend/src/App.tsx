@@ -232,6 +232,24 @@ export default function App() {
     isListeningRef.current = isListening;
   }, [isListening]);
 
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    const handleUserGesture = () => {
+      if (audioContextRef.current && audioContextRef.current.state === "suspended") {
+        audioContextRef.current.resume().then(() => {
+          console.log("AudioContext resumed successfully on user gesture.");
+        });
+      }
+    };
+    window.addEventListener("click", handleUserGesture);
+    window.addEventListener("keydown", handleUserGesture);
+    return () => {
+      window.removeEventListener("click", handleUserGesture);
+      window.removeEventListener("keydown", handleUserGesture);
+    };
+  }, []);
+
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -243,26 +261,35 @@ export default function App() {
       rec.onresult = (event: any) => {
         const resultIndex = event.resultIndex;
         const transcript = event.results[resultIndex][0].transcript.trim().toLowerCase();
-        setVoiceTextLog(`Detected command: "${transcript}"`);
-        processVoiceCommandRef.current(transcript);
+        
+        if (isListeningRef.current) {
+          setVoiceTextLog(`Detected command: "${transcript}"`);
+          processVoiceCommandRef.current(transcript);
+        } else {
+          // Silent Wake Word monitoring mode
+          if (transcript.includes("sentinel activate") || transcript.includes("sentinel online") || transcript.includes("sentinel")) {
+            triggerSentinelUplink("Sentinel wake word detected. Uplink established.");
+          }
+        }
       };
 
       rec.onerror = (e: any) => {
         console.error("Speech Recognition Error", e);
-        setIsListening(false);
       };
 
       rec.onend = () => {
-        if (isListeningRef.current) {
-          try {
-            rec.start();
-          } catch (e) {
-            // Already listening
-          }
-        } else {
-          setIsListening(false);
+        try {
+          rec.start();
+        } catch (err) {
+          // Already listening
         }
       };
+
+      try {
+        rec.start();
+      } catch (err) {
+        console.error("Failed to start SpeechRecognition on load:", err);
+      }
 
       recognitionRef.current = rec;
     } else {
@@ -275,13 +302,6 @@ export default function App() {
     setIsListening(true);
     setVoiceTextLog(msg);
     speakText("Vocal uplink established. Sentinel stands ready.");
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.start();
-      } catch (e) {
-        // already listening
-      }
-    }
   };
 
   useEffect(() => {
@@ -290,44 +310,15 @@ export default function App() {
     let microphone: MediaStreamAudioSourceNode | null = null;
     let javascriptNode: ScriptProcessorNode | null = null;
     let stream: MediaStream | null = null;
-    let wakeRec: any = null;
 
     const setupAudioMonitoring = async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
 
-        // Setup wake word listener
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (SpeechRecognition) {
-          wakeRec = new SpeechRecognition();
-          wakeRec.continuous = true;
-          wakeRec.interimResults = true;
-          wakeRec.lang = "en-US";
-
-          wakeRec.onresult = (event: any) => {
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-              const transcript = event.results[i][0].transcript.trim().toLowerCase();
-              if (transcript.includes("sentinel activate") || transcript.includes("sentinel online") || transcript.includes("sentinel")) {
-                triggerSentinelUplink("Sentinel wake word detected. Uplink established.");
-                break;
-              }
-            }
-          };
-
-          wakeRec.onend = () => {
-            try {
-              wakeRec.start();
-            } catch (e) {
-              // already listening
-            }
-          };
-
-          wakeRec.start();
-        }
-
         // Setup clap/snap spike detection
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         audioContext = new AudioContextClass();
+        audioContextRef.current = audioContext;
         analyser = audioContext.createAnalyser();
         microphone = audioContext.createMediaStreamSource(stream);
         javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
@@ -370,10 +361,6 @@ export default function App() {
     setupAudioMonitoring();
 
     return () => {
-      if (wakeRec) {
-        wakeRec.onend = null;
-        wakeRec.stop();
-      }
       if (javascriptNode) javascriptNode.disconnect();
       if (microphone) microphone.disconnect();
       if (audioContext) audioContext.close();
@@ -385,20 +372,12 @@ export default function App() {
 
   // Toggle Voice Recognition
   const toggleListening = () => {
-    if (!recognitionRef.current) return;
     if (isListening) {
-      recognitionRef.current.stop();
       setIsListening(false);
-      setVoiceTextLog("Voice uplink suspended.");
+      setVoiceTextLog("Voice uplink suspended. Entering silent wake-word mode.");
+      speakText("Voice uplink suspended.");
     } else {
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-        setVoiceTextLog("Uplink active. Awaiting voice instructions...");
-        speakText("Uplink online. State your operations instruction.");
-      } catch (err) {
-        console.error(err);
-      }
+      triggerSentinelUplink("Uplink active. Awaiting voice instructions...");
     }
   };
 
