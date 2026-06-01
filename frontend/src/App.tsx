@@ -26,6 +26,7 @@ import { LimelightNav } from "@/components/ui/limelight-nav";
 import { PixelLogoGrid } from "@/components/ui/pixel-logo-grid";
 import { CpuArchitecture } from "@/components/ui/cpu-architecture";
 import { SreBrain3d } from "@/components/ui/sre-brain-3d";
+import { SreRobot3d } from "@/components/ui/sre-robot-3d";
 import { Spotlight } from "@/components/ui/spotlight";
 
 interface IncidentScenario {
@@ -408,7 +409,7 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen grid-bg p-4 flex flex-col gap-4 text-sm transition-colors duration-500 selection:bg-white/10">
+    <div className="h-screen w-screen grid-bg p-4 flex flex-col gap-4 text-[14.5px] transition-colors duration-500 selection:bg-white/10 overflow-hidden">
       
       {/* 🚀 Header SRE Command Center */}
       <header className={cn(
@@ -420,7 +421,7 @@ export default function App() {
           <PixelLogoGrid className="w-14 h-14 flex-shrink-0" isThreat={!!activeIncident} />
           <div>
             <h1 className="text-2xl font-bold tracking-wider text-white flex items-center gap-2">
-              SENTINELOPS AI <span className="text-[10px] text-cyber-green font-mono font-normal px-2.5 py-0.5 bg-cyber-green/10 border border-cyber-green/20 rounded-md">SWARM DECK v1.2</span>
+              SENTINELOPS AI
             </h1>
             <p className="text-xs text-gray-400 font-mono mt-0.5">Autonomous SRE Swarm & Cybernetic Telemetry Hub</p>
           </div>
@@ -452,17 +453,17 @@ export default function App() {
       </header>
 
       {/* Main Dashboard Grid with Spotlights */}
-      <main className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-grow items-stretch">
+      <main className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-grow items-stretch min-h-0 overflow-hidden">
         
         {/* ==================== LEFT PANEL: Simulation Console & Telemetry ==================== */}
         <section className={cn(
-          "flex flex-col gap-4 transition-all duration-300",
+          "flex flex-col gap-4 transition-all duration-300 h-full min-h-0 overflow-hidden",
           activeNavIndex === 0 ? "lg:col-span-3 flex" : 
           activeNavIndex === 2 ? "lg:col-span-3 flex" : "hidden"
         )}>
           
           {/* Simulation Console Card */}
-          <div className={cn("glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 relative group overflow-hidden")}>
+          <div className={cn("glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 relative group overflow-hidden flex-shrink-0")}>
             <Spotlight size={250} />
             <h2 className="text-xs font-semibold tracking-widest text-white border-b border-white/[0.04] pb-2 flex items-center gap-2 uppercase font-mono relative z-10">
               <Activity className="h-4 w-4 text-cyber-green" /> Outage Control Deck
@@ -504,7 +505,7 @@ export default function App() {
           </div>
 
           {/* SRE VOICE COGNITIVE ASSISTANCE COMMAND CARD */}
-          <div className="glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden group">
+          <div className="glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden group flex-shrink-0">
             <Spotlight size={250} />
             <h2 className="text-xs font-semibold tracking-widest text-white border-b border-white/[0.04] pb-2 flex items-center justify-between uppercase font-mono relative z-10">
               <span className="flex items-center gap-2"><Mic className="h-4 w-4 text-cyber-green animate-pulse" /> SRE Professional Voice</span>
@@ -518,6 +519,11 @@ export default function App() {
             </h2>
 
             <div className="flex flex-col gap-3 relative z-10 justify-between flex-grow">
+              {/* 3D Cybernetic Assistant Hologram */}
+              <div className="h-28 relative w-full flex-shrink-0">
+                <SreRobot3d isThreat={!!activeIncident} isListening={isListening} />
+              </div>
+
               <div className="p-3 bg-black/60 rounded-xl border border-white/[0.04] font-mono text-[11px] text-gray-400 leading-normal min-h-[56px] flex flex-col justify-center">
                 <span className="text-cyber-green font-bold text-[9px] uppercase tracking-wider block mb-1">Telemetry uplink log</span>
                 <span className="line-clamp-2">{voiceTextLog}</span>
@@ -553,7 +559,7 @@ export default function App() {
           </div>
 
           {/* Service Telemetry Monitor Card */}
-          <div className="glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 flex-grow relative overflow-hidden group">
+          <div className="glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 flex-grow min-h-0 relative overflow-hidden group">
             <Spotlight size={300} />
             <div className="flex justify-between items-center border-b border-white/[0.04] pb-2 relative z-10">
               <h2 className="text-xs font-semibold tracking-widest text-white flex items-center gap-2 uppercase font-mono">
@@ -566,7 +572,7 @@ export default function App() {
               )}
             </div>
 
-            <div className="flex flex-col gap-3 py-2 flex-grow justify-around relative z-10">
+            <div className="flex flex-col gap-2 py-1.5 flex-grow justify-between relative z-10 overflow-y-auto">
               {/* CPU Radial Dial */}
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/[0.03] hover:border-white/[0.08] transition-all">
                 <div className="flex items-center gap-2.5">
@@ -665,13 +671,13 @@ export default function App() {
 
         {/* ==================== MIDDLE PANEL: Swarm Node network & Chat dialogues ==================== */}
         <section className={cn(
-          "flex flex-col gap-4 transition-all duration-300",
+          "flex flex-col gap-4 transition-all duration-300 h-full min-h-0 overflow-hidden",
           activeNavIndex === 0 ? "lg:col-span-5 flex" :
           activeNavIndex === 1 ? "lg:col-span-12 flex" : "hidden"
         )}>
           
           {/* Interactive SRE Swarm Brain 3D Topology */}
-          <div className="glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden group">
+          <div className="glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden group flex-shrink-0">
             <Spotlight size={300} />
             <h2 className="text-xs font-semibold tracking-widest text-white border-b border-white/[0.04] pb-2 flex items-center gap-2 uppercase font-mono relative z-10">
               <Network className="h-4 w-4 text-cyber-green" /> Cybernetic Topology Swarm
@@ -692,7 +698,7 @@ export default function App() {
           </div>
 
           {/* Live Swarm Conversation Card */}
-          <div className="glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 flex-grow overflow-hidden min-h-[300px] relative">
+          <div className="glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 flex-grow min-h-0 overflow-hidden relative">
             <Spotlight size={350} />
             <div className="flex justify-between items-center border-b border-white/[0.04] pb-2 relative z-10">
               <h2 className="text-xs font-semibold tracking-widest text-white flex items-center gap-2 uppercase font-mono">
@@ -711,7 +717,7 @@ export default function App() {
 
             <div 
               ref={swarmTerminalRef}
-              className="flex-grow overflow-y-auto pr-1 flex flex-col gap-3 min-h-[180px] relative z-10"
+              className="flex-grow overflow-y-auto pr-1 flex flex-col gap-3 relative z-10"
             >
               {swarmConversations.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-500 font-mono text-xs">
@@ -757,7 +763,7 @@ export default function App() {
                           <Clock className="h-2.5 w-2.5" /> {msg.timestamp}
                         </span>
                       </div>
-                      <p className="text-gray-300 font-mono text-xs whitespace-pre-wrap leading-relaxed">
+                      <p className="text-gray-300 font-mono text-[13.5px] whitespace-pre-wrap leading-relaxed">
                         {msg.message}
                       </p>
                     </div>
@@ -770,7 +776,7 @@ export default function App() {
 
         {/* ==================== RIGHT PANEL: Real-time logs & Markdown SRE Postmortem ==================== */}
         <section className={cn(
-          "flex flex-col gap-4 transition-all duration-300",
+          "flex flex-col gap-4 transition-all duration-300 h-full min-h-0 overflow-hidden",
           activeNavIndex === 0 ? "lg:col-span-4 flex" :
           activeNavIndex === 2 ? "lg:col-span-9 flex" :
           activeNavIndex === 3 ? "lg:col-span-12 flex" : "hidden"
@@ -778,7 +784,7 @@ export default function App() {
           
           {/* Active alerts warning notification banner */}
           {alerts.length > 0 && (
-            <div className="bg-cyber-red/10 border border-cyber-red/25 rounded-2xl p-4 flex gap-3 shadow-xl shadow-cyber-red/5 animate-pulse relative overflow-hidden">
+            <div className="bg-cyber-red/10 border border-cyber-red/25 rounded-2xl p-3 flex gap-3 shadow-xl shadow-cyber-red/5 animate-pulse relative overflow-hidden flex-shrink-0">
               <AlertTriangle className="h-6 w-6 text-cyber-red flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-bold text-white font-mono text-xs">TELEMETRY ANOMALY WARNING</p>
@@ -789,8 +795,8 @@ export default function App() {
 
           {/* Live system logs terminal Card */}
           <div className={cn(
-            "glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden",
-            activeNavIndex === 2 ? "h-full min-h-[500px]" : "h-1/2 min-h-[220px]"
+            "glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden min-h-0",
+            activeNavIndex === 2 ? "h-full" : "h-1/2"
           )}>
             <Spotlight size={300} />
             <div className="flex justify-between items-center border-b border-white/[0.04] pb-2 relative z-10">
@@ -802,7 +808,7 @@ export default function App() {
 
             <div 
               ref={logTerminalRef}
-              className="flex-grow code-terminal rounded-xl p-3 overflow-y-auto pr-1 flex flex-col gap-1.5 font-mono text-[10px] relative z-10"
+              className="flex-grow code-terminal rounded-xl p-3 overflow-y-auto pr-1 flex flex-col gap-1.5 font-mono text-[12px] relative z-10"
             >
               {logs.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-center text-gray-600 font-mono text-[10px]">
@@ -833,8 +839,8 @@ export default function App() {
 
           {/* markdown postmortem reader Card */}
           <div className={cn(
-            "glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden",
-            activeNavIndex === 3 ? "h-full min-h-[500px]" : "h-1/2 min-h-[220px]"
+            "glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden min-h-0",
+            activeNavIndex === 3 ? "h-full" : "h-1/2"
           )}>
             <Spotlight size={300} />
             <div className="flex justify-between items-center border-b border-white/[0.04] pb-2 relative z-10">
@@ -860,18 +866,18 @@ export default function App() {
               )}
             </div>
 
-            <div className="flex-grow overflow-y-auto code-terminal rounded-xl p-4 font-mono text-xs text-gray-300 leading-relaxed relative z-10">
+            <div className="flex-grow overflow-y-auto code-terminal rounded-xl p-4 font-mono text-[13.5px] text-gray-300 leading-relaxed relative z-10">
               {postmortemReport ? (
                 <div className="flex flex-col gap-3.5 select-text">
                   {postmortemReport.split("\n").map((line, idx) => {
                     if (line.startsWith("# ")) {
-                      return <h1 key={idx} className="text-sm font-bold text-white tracking-wide border-b border-white/[0.04] pb-1 mt-2">{line.replace("# ", "")}</h1>;
+                      return <h1 key={idx} className="text-base font-bold text-white tracking-wide border-b border-white/[0.04] pb-1.5 mt-3">{line.replace("# ", "")}</h1>;
                     }
                     if (line.startsWith("## ")) {
-                      return <h2 key={idx} className="text-xs font-bold text-cyber-green mt-3 flex items-center gap-1"><ChevronRight className="h-3 w-3" /> {line.replace("## ", "")}</h2>;
+                      return <h2 key={idx} className="text-sm font-bold text-cyber-green mt-4 flex items-center gap-1.5"><ChevronRight className="h-3.5 w-3.5" /> {line.replace("## ", "")}</h2>;
                     }
                     if (line.startsWith("### ")) {
-                      return <h3 key={idx} className="text-[11px] font-bold text-emerald-400 mt-2">{line.replace("### ", "")}</h3>;
+                      return <h3 key={idx} className="text-[13px] font-bold text-emerald-400 mt-3">{line.replace("### ", "")}</h3>;
                     }
                     if (line.startsWith("|") && line.includes("---")) {
                       return null; 
@@ -881,7 +887,7 @@ export default function App() {
                       const isHeader = line.includes("Parameter");
                       return (
                         <div key={idx} className={cn(
-                          "grid grid-cols-2 p-1.5 border-b border-white/[0.02] font-mono text-[10px]",
+                          "grid grid-cols-2 p-1.5 border-b border-white/[0.02] font-mono text-[11px]",
                           isHeader ? 'bg-cyber-green/10 font-bold border-t border-b border-cyber-green/20 text-white rounded-lg' : ''
                         )}>
                           <span>{cells[0]}</span>
@@ -893,9 +899,9 @@ export default function App() {
                       return null;
                     }
                     if (line.trim().startsWith("-") || line.trim().startsWith("*")) {
-                      return <li key={idx} className="list-none pl-4 relative before:content-['-'] before:absolute before:left-0 before:text-cyber-green font-mono text-xs">{line.substring(2)}</li>;
+                      return <li key={idx} className="list-none pl-4 relative before:content-['-'] before:absolute before:left-0 before:text-cyber-green font-mono text-[13px]">{line.substring(2)}</li>;
                     }
-                    return <p key={idx} className="text-gray-300 leading-relaxed font-mono text-[11px]">{line}</p>;
+                    return <p key={idx} className="text-gray-300 leading-relaxed font-mono text-[13px]">{line}</p>;
                   })}
                 </div>
               ) : (
@@ -924,7 +930,7 @@ export default function App() {
             <Info className="h-3.5 w-3.5 text-cyber-green animate-pulse" /> SentinelOps SRE platform runs fully offline using local RAG runbooks.
           </span>
         </div>
-        <span>© 2026 SentinelOps AI • pair-programmed by Google Deepmind AI</span>
+        <span>© 2026 SentinelOps AI • Developed by Arjun R</span>
       </footer>
     </div>
   );

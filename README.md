@@ -94,7 +94,7 @@ npm run dev
 
 ---
 
-##  Premium Cybersecurity Aesthetics
+##  Cybersecurity Aesthetics
 
 SentinelOps AI is dressed in a **gorgeous cyberpunk SRE interface**:
 - **Frosted Glassmorphism**: Cards styled with dynamic backdrop filters (`backdrop-blur`) and thin borders that floatingly overlay our deep radial canvas grid.

@@ -1,13 +1,9 @@
+# backend/assistant.py
 import os
 import json
-import httpx
-from fastapi import FastAPI, Request
+from fastapi import APIRouter, Request
 
-app = FastAPI()
-
-# Load your OpenAI (or other provider) API key from .env or environment variables
-LLM_ENDPOINT = "https://api.openai.com/v1/chat/completions"
-LLM_KEY = os.getenv("OPENAI_API_KEY")
+router = APIRouter(prefix="/assistant")
 
 # Whitelist of intents that the front‑end may request
 COMMAND_WHITELIST = {
@@ -15,8 +11,27 @@ COMMAND_WHITELIST = {
     "deploy_swarm": {"fn": "trigger_swarm", "params": []},
     "resolve_incident": {"fn": "resolve_incident", "params": []},
     "status_report": {"fn": "fetch_status", "params": []},
-    # Extend with more safe actions as needed
 }
+
+def get_llm():
+    openai_key = os.getenv("OPENAI_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    
+    if openai_key:
+        try:
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(model="gpt-4o-mini", temperature=0.0, api_key=openai_key)
+        except Exception:
+            pass
+            
+    if gemini_key:
+        try:
+            from langchain_google_genai import ChatGoogleGenAI
+            return ChatGoogleGenAI(model="gemini-1.5-flash", temperature=0.0, google_api_key=gemini_key)
+        except Exception:
+            pass
+            
+    return None
 
 def parse_intent(response_text: str):
     """Expect the LLM to output a JSON object like:
@@ -24,57 +39,75 @@ def parse_intent(response_text: str):
        If parsing fails we mark the intent as unknown.
     """
     try:
-        return json.loads(response_text)
+        text = response_text.strip()
+        if text.startswith("```json"):
+            text = text[7:]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+        return json.loads(text)
     except Exception:
         return {"intent": "unknown", "params": {}}
 
-@app.post("/assistant/interpret")
+def heuristic_interpret(transcript: str) -> dict:
+    t = transcript.lower()
+    if "inject" in t or "trigger" in t or "crash" in t or "simulate" in t:
+        incident_id = "DB_CONNECTION_EXHAUSTION"
+        if "memory" in t or "leak" in t or "auth" in t:
+            incident_id = "AUTH_SERVICE_MEMORY_LEAK"
+        elif "gateway" in t or "timeout" in t or "api" in t:
+            incident_id = "API_GATEWAY_TIMEOUT"
+        elif "env" in t or "config" in t or "missing" in t:
+            incident_id = "MISSING_ENV_CONFIG"
+        elif "disk" in t or "space" in t or "logger" in t or "exhaust" in t:
+            incident_id = "DISK_SPACE_EXHAUSTION_LOGGER"
+        return {"intent": "inject_crash", "params": {"incident_id": incident_id}}
+    elif "deploy" in t or "swarm" in t or "analyze" in t:
+        return {"intent": "deploy_swarm", "params": {}}
+    elif "resolve" in t or "remedy" in t or "rollback" in t or "restart" in t:
+        return {"intent": "resolve_incident", "params": {}}
+    elif "status" in t or "report" in t or "brief" in t:
+        return {"intent": "status_report", "params": {}}
+    return {"intent": "unknown", "params": {}}
+
+@router.post("/interpret")
 async def interpret(request: Request):
     data = await request.json()
     transcript = data.get("transcript", "")
 
-    # Prompt the LLM – keep temperature low for deterministic output
-    payload = {
-        "model": "gpt-4o-mini",
-        "messages": [
-            {"role": "system", "content": "You are a helpful SRE assistant. Return a JSON object with an 'intent' key and a 'params' dict. Only use intents that appear in the whitelist."},
-            {"role": "user", "content": transcript}
-        ],
-        "temperature": 0.0
-    }
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            LLM_ENDPOINT,
-            json=payload,
-            headers={"Authorization": f"Bearer {LLM_KEY}"}
-        )
-    llm_output = resp.json()["choices"][0]["message"]["content"]
-    parsed = parse_intent(llm_output)
+    llm = get_llm()
+    if llm:
+        try:
+            prompt = (
+                "You are a helpful SRE assistant. Return a JSON object with an 'intent' key and a 'params' dict.\n"
+                f"Whitelist of allowed intents: {list(COMMAND_WHITELIST.keys())}\n"
+                "Allowed incident IDs for inject_crash: ['DB_CONNECTION_EXHAUSTION', 'AUTH_SERVICE_MEMORY_LEAK', 'API_GATEWAY_TIMEOUT', 'MISSING_ENV_CONFIG', 'DISK_SPACE_EXHAUSTION_LOGGER']\n"
+                f"Voice Transcript: '{transcript}'"
+            )
+            response = llm.invoke(prompt)
+            parsed = parse_intent(response.content)
+            
+            intent = parsed.get("intent")
+            if intent in COMMAND_WHITELIST:
+                return {"intent": intent, "params": parsed.get("params", {})}
+        except Exception:
+            pass
+            
+    # Fallback to local heuristic parsing
+    return heuristic_interpret(transcript)
 
-    intent = parsed.get("intent")
-    if intent not in COMMAND_WHITELIST:
-        return {"error": "unrecognized_intent", "raw": llm_output}
-
-    return {"intent": intent, "params": parsed.get("params", {})}
-
-# Optional: a generic query endpoint for free‑form answers
-@app.post("/assistant/query")
+@router.post("/query")
 async def query(request: Request):
     data = await request.json()
     question = data.get("question", "")
-    payload = {
-        "model": "gpt-4o-mini",
-        "messages": [
-            {"role": "system", "content": "You are a concise SRE assistant. Answer the question in plain English without disclosing secrets."},
-            {"role": "user", "content": question}
-        ],
-        "temperature": 0.2
-    }
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            LLM_ENDPOINT,
-            json=payload,
-            headers={"Authorization": f"Bearer {LLM_KEY}"}
-        )
-    answer = resp.json()["choices"][0]["message"]["content"]
-    return {"answer": answer}
+    
+    llm = get_llm()
+    if llm:
+        try:
+            prompt = f"You are a concise SRE assistant. Answer the question in plain English without disclosing secrets. Question: {question}"
+            response = llm.invoke(prompt)
+            return {"answer": response.content}
+        except Exception as e:
+            return {"answer": f"Error running LLM query: {str(e)}"}
+            
+    return {"answer": "Voice command parsed. SRE command center standing by."}
