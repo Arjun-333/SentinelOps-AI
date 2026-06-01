@@ -200,7 +200,7 @@ export default function App() {
 
   // High-End Professional Voice Synthesizer
   const speakText = (text: string) => {
-    if (!voiceBriefingActive) return;
+    if (!voiceBriefingActiveRef.current) return;
     window.speechSynthesis.cancel();
     
     const utterance = new SpeechSynthesisUtterance(text);
@@ -231,6 +231,11 @@ export default function App() {
   useEffect(() => {
     isListeningRef.current = isListening;
   }, [isListening]);
+
+  const voiceBriefingActiveRef = useRef(voiceBriefingActive);
+  useEffect(() => {
+    voiceBriefingActiveRef.current = voiceBriefingActive;
+  }, [voiceBriefingActive]);
 
   const audioContextRef = useRef<AudioContext | null>(null);
 
