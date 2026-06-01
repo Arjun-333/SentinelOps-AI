@@ -1,0 +1,51 @@
+[
+    {
+        "id": "RUNBOOK_DB_LEAKS",
+        "title": "SRE Troubleshooting Guide: Connection Pool Exhaustion and Leaks",
+        "category": "Runbook",
+        "tags": ["database", "hikari", "postgres", "pool", "threads"],
+        "content": "Database connection exhaustion typically manifests as HikariPool timeouts, ConnectionTimeoutErrors, or PostgreSQL FATAL: remaining connection slots errors. This occurs when applications acquire connections from a pool but fail to return them, leading to pool starvation. When developing multithreaded workers, connections must be closed within the thread context. Ensure all connection allocation calls use try/finally blocks or context manager syntax (e.g. 'with db.get_connection() as conn:'). Inspect recent code changes for manual thread management where connections are instantiated but have no corresponding release closures."
+    },
+    {
+        "id": "RUNBOOK_OOM_NODEJS",
+        "title": "SRE Troubleshooting Guide: NodeJS/V8 Heap Out-of-Memory (ExitCode 137)",
+        "category": "Runbook",
+        "tags": ["nodejs", "memory", "leak", "oom", "v8"],
+        "content": "V8 Heap Out-Of-Memory is characterized by logarithmic or step-ladder memory growth in container metrics until the runtime exits with OOMKilled status. This is commonly caused by global JavaScript variables, cache maps that do not enforce key expirations or size bounds, or heavy event listeners. SRE mitigation involves immediate rollback to the previous stable release. Permanent fix requires refactoring the in-memory cache to use external distributed caches (e.g., Redis with active Key Eviction TTLs) or utilizing a capped memory structure like lru-cache."
+    },
+    {
+        "id": "RUNBOOK_K8S_DNS",
+        "title": "SRE Troubleshooting Guide: Kubernetes Service DNS and Upstream Gateway Timeouts",
+        "category": "Runbook",
+        "tags": ["kubernetes", "dns", "gateway", "nginx", "route"],
+        "content": "Nginx upstream connection timeouts (504 Gateway Timeout) occur when the API Gateway cannot resolve or connect to target backend microservices. Standard vectors: 1) CoreDNS resolution failure due to DNS caching or misconfigured service names. 2) Kubernetes NetworkPolicies blocking ingress/egress. 3) Hostname mismatches in Nginx configuration where local internal service names (e.g. service.namespace.svc.cluster.local) are incorrect. Verify that service hostnames match target endpoints and that CoreDNS is functioning by executing 'nslookup' inside a gateway debug container."
+    },
+    {
+        "id": "RUNBOOK_ENV_CONFIG",
+        "title": "SRE Troubleshooting Guide: Missing Deployment Configurations and KeyErrors",
+        "category": "Runbook",
+        "tags": ["kubernetes", "config", "env", "helm", "crash"],
+        "content": "Immediate crashlooping on startup with KeyError or ValueError in environment variable lookup (e.g. os.environ['VAR']) indicates a desynchronization between code requirements and deployment templates. When adding mandatory settings, developers must update Helm values, Kubernetes ConfigMaps, or docker-compose manifests. Mitigation: Inject the missing environment key-value pairs directly in the Deployment specification, or update ConfigMaps and trigger a rolling update of the service."
+    },
+    {
+        "id": "RUNBOOK_DISK_FULL",
+        "title": "SRE Troubleshooting Guide: Volume Space Exhaustion and Audit Logging",
+        "category": "Runbook",
+        "tags": ["disk", "logs", "volume", "rotation", "ioerror"],
+        "content": "Disk space exhaustion (Errno 28 No space left on device) blocks writes and crashes logging and transaction queues. Causes include: 1) LOG_LEVEL set to DEBUG in production, which floods systems with heavy payloads. 2) Disabled log rotation (e.g., logrotate, custom handlers). SRE resolution: Truncate large raw log files instantly via 'echo > /var/log/audit.log', check logrotate configuration, and adjust LOG_LEVEL to INFO or WARN."
+    },
+    {
+        "id": "HISTORICAL_INCIDENT_892",
+        "title": "Incident #892 Postmortem: Payment Gateway Threadpool Leak",
+        "category": "Historical Incident",
+        "tags": ["database", "payment-service", "leak", "hikari"],
+        "content": "Outage Summary: The payment-service crashed under high load, returning 504 gateway errors. Investigation revealed HikariPool-1 was starved. Root Cause: Commit a8e92c introduced a concurrent payment executor. Connections were requested inside the thread scope but weren't closed because the handler caught an exception and bypassed conn.close(). Fix: Wrapped the thread context in a try/finally block ensuring 'conn.close()' runs in all execution outcomes."
+    },
+    {
+        "id": "HISTORICAL_INCIDENT_412",
+        "title": "Incident #412 Postmortem: Session Storage Auth OOM",
+        "category": "Historical Incident",
+        "tags": ["auth-service", "memory", "leak", "cache"],
+        "content": "Outage Summary: Auth-service crashed repeatedly due to V8 process out of memory. Root Cause: Local caching of JWT keys inside a global object mapped tokens indefinitely. Fix: Swapped the local caching scheme for Redis key storage with a 1-hour active TTL expiration."
+    }
+]

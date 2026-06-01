@@ -1,0 +1,232 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Safe State (Default) */
+    --threat-primary: #10b981;
+    --threat-primary-rgb: 16, 185, 129;
+    --threat-primary-glow: rgba(16, 185, 129, 0.12);
+    --threat-border: rgba(16, 185, 129, 0.15);
+    --threat-bg-glow: rgba(16, 185, 129, 0.015);
+    --cyber-bg: #030305;
+    --cyber-border: rgba(255, 255, 255, 0.03);
+    --cyber-blue: #10b981; /* Shift primary accent to match state */
+    --cyber-green: #10b981;
+    --cyber-red: #ef4444;
+    --cyber-amber: #f59e0b;
+    --cyber-purple: #10b981; /* Align UI colors to safe green standard */
+  }
+
+  :root.threat-alert {
+    /* Outage/Threat State */
+    --threat-primary: #ef4444;
+    --threat-primary-rgb: 239, 68, 68;
+    --threat-primary-glow: rgba(239, 68, 68, 0.18);
+    --threat-border: rgba(239, 68, 68, 0.28);
+    --threat-bg-glow: rgba(239, 68, 68, 0.03);
+    --cyber-blue: #ef4444;
+    --cyber-purple: #ef4444;
+  }
+
+  body {
+    @apply bg-cyber-bg text-gray-200 antialiased font-sans overflow-x-hidden selection:bg-white/10;
+    transition: background-image 0.5s ease;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(10, 10, 15, 0.95) 0, transparent 55%),
+      radial-gradient(at 50% 0%, var(--threat-bg-glow) 0, transparent 65%),
+      radial-gradient(at 100% 0%, rgba(15, 15, 22, 0.9) 0, transparent 50%),
+      radial-gradient(at 50% 100%, #020203 0, #050608 100%);
+  }
+
+  /* Custom Neon Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: rgba(2, 2, 4, 0.95);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--threat-primary);
+  }
+}
+
+/* Premium Glassmorphic Layouts */
+.neon-grid {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255,255,255,0.02) 0px,
+    rgba(255,255,255,0.02) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+  animation: neonGridMove 8s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+@keyframes neonGridMove {
+  from { background-position: 0 0; }
+  to { background-position: 100% 100%; }
+}
+
+.glass-panel.threat-glow {
+  border-color: var(--threat-border);
+  box-shadow: 0 0 25px 0 rgba(var(--threat-primary-rgb), 0.06);
+}
+
+.glass-panel-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glass-panel-hover:hover {
+  background: rgba(10, 15, 28, 0.85);
+  border-color: var(--threat-primary);
+  box-shadow: 0 0 25px rgba(var(--threat-primary-rgb), 0.08);
+}
+
+/* Code Syntax Styling for Terminal / Postmortem */
+.code-terminal {
+  background: rgba(4, 6, 10, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* Dynamic Alert/Radar Grid Overlay */
+.grid-bg {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.012) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
+}
+
+/* Keyframes & Micro-Animations */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.96);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(0.96);
+    opacity: 0.8;
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2.5s infinite ease-in-out;
+}
+
+@keyframes scanner {
+  0% {
+    top: 0%;
+  }
+  50% {
+    top: 100%;
+  }
+  100% {
+    top: 0%;
+  }
+}
+
+.animate-scanner {
+  animation: scanner 5s infinite linear;
+}
+
+/* Custom glowing state classes */
+.glow-text-green {
+  text-shadow: 0 0 8px rgba(16, 185, 129, 0.35);
+}
+.glow-text-amber {
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.35);
+}
+.glow-text-red {
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+}
+
+/* Slide-in Animations for agent communication */
+@keyframes message-slide {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-message-slide {
+  animation: message-slide 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* CPU Architecture Orb Flow Keyframes */
+.cpu-architecture {
+  offset-path: var(--cpu-path);
+  animation: cpu-orb-flow 6s linear infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes cpu-orb-flow {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+.cpu-line-1 {
+  --cpu-path: path("M 10 20 h 79.5 q 5 0 5 5 v 24");
+  animation-duration: 4.5s;
+}
+.cpu-line-2 {
+  --cpu-path: path("M 180 10 h -69.7 q -5 0 -5 5 v 24");
+  animation-duration: 5.2s;
+}
+.cpu-line-3 {
+  --cpu-path: path("M 130 20 v 21.8 q 0 5 -5 5 h -25");
+  animation-duration: 3.8s;
+  animation-delay: 1.2s;
+}
+.cpu-line-4 {
+  --cpu-path: path("M 170 80 v -21.8 q 0 -5 -5 -5 h -65");
+  animation-duration: 4.8s;
+  animation-delay: 0.5s;
+}
+.cpu-line-5 {
+  --cpu-path: path("M 135 65 h 15 q 5 0 5 5 v 10 q 0 5 -5 5 h -39.8 q -5 0 -5 -5 v -35");
+  animation-duration: 6.5s;
+}
+.cpu-line-6 {
+  --cpu-path: path("M 94.8 95 v -46");
+  animation-duration: 3s;
+  animation-delay: 2s;
+}
+.cpu-line-7 {
+  --cpu-path: path("M 88 88 v -15 q 0 -5 -5 -5 h -10 q -5 0 -5 -5 v -5 q 0 -5 5 -5 h 28");
+  animation-duration: 5.8s;
+}
+.cpu-line-8 {
+  --cpu-path: path("M 30 30 h 25 q 5 0 5 5 v 6.5 q 0 5 5 5 h 35");
+  animation-duration: 4.2s;
+  animation-delay: 1.5s;
+}
+
