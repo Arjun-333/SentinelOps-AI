@@ -263,7 +263,7 @@ export default function App() {
       const rec = new SpeechRecognition();
       rec.continuous = true;
       rec.interimResults = false;
-      rec.lang = "en-US";
+      rec.lang = navigator.language || "en-US";
 
       rec.onresult = (event: any) => {
         const resultIndex = event.resultIndex;
@@ -273,8 +273,9 @@ export default function App() {
           setVoiceTextLog(`Detected command: "${transcript}"`);
           processVoiceCommandRef.current(transcript);
         } else {
-          // Silent Wake Word monitoring mode
-          if (transcript.includes("sentinel activate") || transcript.includes("sentinel online") || transcript.includes("sentinel")) {
+          // Silent Wake Word monitoring mode (phonetically tolerant to Sentinel, Central, Centinal, etc.)
+          const isWake = ["sentinel", "sentinal", "central", "centinal", "centinel", "activate", "online"].some(k => transcript.includes(k));
+          if (isWake) {
             triggerSentinelUplink("Sentinel wake word detected. Uplink established.");
           }
         }
@@ -390,28 +391,36 @@ export default function App() {
 
   // Process SRE Audio Voice commands
   function processVoiceCommand(command: string) {
-    if (command.includes("inject") || command.includes("trigger") || command.includes("crash")) {
+    const clean = command.toLowerCase().trim();
+    
+    // Fuzzy matching categories (tolerant to homophones and regional accents)
+    const isInject = ["inject", "trigger", "crash", "fault", "simulate", "outage", "problem", "leak", "fail", "crush", "cash", "tigger"].some(k => clean.includes(k));
+    const isSwarm = ["deploy", "swarm", "analyze", "inspect", "diagnostic", "debug", "run", "start", "commence", "storm", "form", "warm"].some(k => clean.includes(k));
+    const isResolve = ["restart", "resolve", "remedy", "rollback", "fix", "cure", "recover", "clear", "reboot", "remade"].some(k => clean.includes(k));
+    const isBrief = ["brief", "explain", "status", "info", "detail", "update", "report"].some(k => clean.includes(k));
+
+    if (isInject) {
       if (activeIncident) {
         speakText("Fault profile already active. Remediate active outage first.");
         return;
       }
       speakText("Initiating outage simulation profile.");
       handleTriggerIncident();
-    } else if (command.includes("deploy") || command.includes("swarm") || command.includes("analyze")) {
+    } else if (isSwarm) {
       if (!activeIncident) {
         speakText("Telemetry nominal. Diagnostic swarm deployment bypassed.");
         return;
       }
       speakText("Deploying SRE swarm correlator nodes.");
       handleTriggerSwarm();
-    } else if (command.includes("restart") || command.includes("resolve") || command.includes("remedy") || command.includes("rollback")) {
+    } else if (isResolve) {
       if (!activeIncident) {
         speakText("All endpoints operating standard parameters.");
         return;
       }
       speakText("Remediating cluster configuration and rebooting nodes.");
       handleResolveIncident();
-    } else if (command.includes("brief") || command.includes("explain") || command.includes("status")) {
+    } else if (isBrief) {
       if (activeIncident) {
         speakText(`Warning. A critical ${activeIncident.name} incident is currently active. Impacted service is ${activeIncident.service}. System latencies are elevated.`);
       } else {
