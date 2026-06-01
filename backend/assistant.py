@@ -116,6 +116,8 @@ async def query(request: Request):
         return {"answer": "I am Sentinel, your Site Reliability Swarm coordinator. I am built to monitor and resolve infrastructure anomalies."}
     elif "hello" in q or "hi" in q or "hey" in q:
         return {"answer": "Hello. Operations uplink is nominal. How can I assist you with the cluster today?"}
+    elif "shut you up" in q or "quiet" in q or "silence" in q or "mute" in q:
+        return {"answer": "You can mute my voice by clicking the speaker icon in the SRE Professional Voice panel, or say 'suspend voice' to disconnect my listener."}
     elif "arjun" in q:
         return {"answer": "Arjun R is the lead systems architect of the SentinelOps AI platform."}
     elif "theme" in q:
