@@ -710,7 +710,13 @@ export default function App() {
             <h2 className="text-xs font-semibold tracking-widest text-white border-b border-white/[0.04] pb-2 flex items-center justify-between uppercase font-mono relative z-10">
               <span className="flex items-center gap-2"><Mic className="h-4 w-4 text-cyber-green animate-pulse" /> SRE Professional Voice</span>
               <button 
-                onClick={() => setVoiceBriefingActive(!voiceBriefingActive)}
+                onClick={() => {
+                  const nextState = !voiceBriefingActive;
+                  setVoiceBriefingActive(nextState);
+                  if (!nextState) {
+                    window.speechSynthesis.cancel();
+                  }
+                }}
                 className="text-[10px] text-gray-500 hover:text-white transition-colors"
                 title="Toggle vocal briefings"
               >
