@@ -204,18 +204,19 @@ export default function App() {
     window.speechSynthesis.cancel();
     
     const utterance = new SpeechSynthesisUtterance(text);
-    // Lower rate and slightly lower pitch for a calm, professional, high-end masculine cybernetic operations voice
-    utterance.rate = 0.95;
-    utterance.pitch = 0.88;
+    // Deeper pitch and rate for a calm, commanding, masculine cybernetic voice
+    utterance.rate = 0.92;
+    utterance.pitch = 0.72;
     
     const voices = window.speechSynthesis.getVoices();
-    // Look for high-end professional system voices (Google US English Male or Microsoft Natural)
+    // Prioritize deep male voices (David, Google US English Male, Guy, etc.)
     const synthVoice = voices.find(v => 
-      v.name.includes("Google US English Male") || 
-      v.name.includes("Natural") || 
-      v.name.includes("Male") || 
-      v.lang.startsWith("en-US")
-    );
+      v.name.toLowerCase().includes("david") ||
+      v.name.toLowerCase().includes("google us english male") ||
+      v.name.toLowerCase().includes("male") ||
+      v.name.toLowerCase().includes("guy")
+    ) || voices.find(v => v.lang.startsWith("en-US")) || voices[0];
+    
     if (synthVoice) utterance.voice = synthVoice;
     
     window.speechSynthesis.speak(utterance);
