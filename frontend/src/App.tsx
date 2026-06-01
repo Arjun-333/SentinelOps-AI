@@ -204,18 +204,19 @@ export default function App() {
     window.speechSynthesis.cancel();
     
     const utterance = new SpeechSynthesisUtterance(text);
-    // Deeper pitch and rate for a calm, commanding, masculine cybernetic voice
-    utterance.rate = 0.92;
-    utterance.pitch = 0.72;
+    // Lower rate and deep pitch shift (0.58) for a resonant, masculine cybernetic computer voice
+    utterance.rate = 0.90;
+    utterance.pitch = 0.58;
     
     const voices = window.speechSynthesis.getVoices();
-    // Prioritize deep male voices (David, Google US English Male, Guy, etc.)
-    const synthVoice = voices.find(v => 
-      v.name.toLowerCase().includes("david") ||
-      v.name.toLowerCase().includes("google us english male") ||
-      v.name.toLowerCase().includes("male") ||
-      v.name.toLowerCase().includes("guy")
-    ) || voices.find(v => v.lang.startsWith("en-US")) || voices[0];
+    // Print voice inventory to console for diagnostic checks
+    console.log("Available Speech Voices:", voices.map(v => `${v.name} (${v.lang})`));
+
+    // Prioritize masculine profiles (David, Google US English Male, Guy, George, etc.)
+    const synthVoice = voices.find(v => {
+      const name = v.name.toLowerCase();
+      return name.includes("male") || name.includes("david") || name.includes("guy") || name.includes("george");
+    }) || voices.find(v => v.lang.toLowerCase().startsWith("en-us")) || voices.find(v => v.lang.toLowerCase().startsWith("en")) || voices[0];
     
     if (synthVoice) utterance.voice = synthVoice;
     
