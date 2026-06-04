@@ -142,15 +142,18 @@ export const SreRobot3d = ({ className, isThreat = false, isListening = false }:
     renderer.domElement.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
 
-    const handleResize = () => {
-      if (!container) return;
-      const w = container.clientWidth || container.offsetWidth;
-      const h = container.clientHeight || container.offsetHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-    };
-    window.addEventListener("resize", handleResize);
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = entry.contentRect.width || container.clientWidth;
+        const h = entry.contentRect.height || container.clientHeight;
+        if (w > 0 && h > 0) {
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          renderer.setSize(w, h);
+        }
+      }
+    });
+    resizeObserver.observe(container);
 
     let clock = new THREE.Clock();
     let animationFrameId: number;
@@ -202,7 +205,7 @@ export const SreRobot3d = ({ className, isThreat = false, isListening = false }:
 
     return () => {
       cancelAnimationFrame(animationFrameId);
-      window.removeEventListener("resize", handleResize);
+      resizeObserver.disconnect();
       window.removeEventListener("mouseup", handleMouseUp);
       if (renderer && renderer.domElement) {
         renderer.domElement.removeEventListener("mousedown", handleMouseDown);

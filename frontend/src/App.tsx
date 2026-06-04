@@ -87,6 +87,60 @@ export default function App() {
   const [postmortemReport, setPostmortemReport] = useState<string>("");
   const [copied, setCopied] = useState(false);
 
+  // SSH simulation state
+  const [terminalLines, setTerminalLines] = useState<string[]>([]);
+  const [terminalActive, setTerminalActive] = useState(false);
+
+  // Metrics history state
+  const [metricsHistory, setMetricsHistory] = useState<any[]>(
+    Array.from({ length: 15 }, () => ({
+      cpu: 12,
+      memory: 80,
+      db_connections: 8,
+      latency: 15,
+      error_rate: 0
+    }))
+  );
+
+  // Custom Incident Configurator State
+  const [showCustomConfigurator, setShowCustomConfigurator] = useState(false);
+  const [customIncident, setCustomIncident] = useState({
+    id: "",
+    name: "",
+    severity: "CRITICAL",
+    service: "",
+    description: "",
+    logs: ""
+  });
+  const [customIncidentStatus, setCustomIncidentStatus] = useState("");
+
+  // RAG Runbooks Manager State
+  const [runbooks, setRunbooks] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [newRunbook, setNewRunbook] = useState({
+    id: "",
+    title: "",
+    category: "Runbook",
+    tags: "",
+    content: ""
+  });
+  const [selectedRunbook, setSelectedRunbook] = useState<any>(null);
+  const [runbookActionStatus, setRunbookActionStatus] = useState("");
+
+  useEffect(() => {
+    fetch("http://localhost:8000/api/runbooks")
+      .then(res => res.json())
+      .then(data => {
+        setRunbooks(data);
+        if (data.length > 0) {
+          setSelectedRunbook(data[0]);
+        }
+      })
+      .catch(err => console.error("Error fetching runbooks", err));
+  }, []);
+
   // Voice Assistance State
   const [isListening, setIsListening] = useState(false);
   const [voiceBriefingActive, setVoiceBriefingActive] = useState(true);
@@ -147,6 +201,11 @@ export default function App() {
           setMetrics(data.metrics);
           setAlerts(data.alerts);
           setLogs(data.logs);
+          setMetricsHistory(prev => {
+            const next = [...prev, data.metrics];
+            if (next.length > 15) return next.slice(next.length - 15);
+            return next;
+          });
         })
         .catch(err => console.error("Error polling simulator status", err));
     };
@@ -281,8 +340,10 @@ export default function App() {
         }
       };
 
+      let errorCount = 0;
       rec.onerror = (e: any) => {
         console.error("Speech Recognition Error", e);
+        errorCount++;
         if (e.error === "not-allowed") {
           setVoiceTextLog("Mic permission denied. Use manual command input below.");
         } else if (e.error === "network") {
@@ -293,10 +354,17 @@ export default function App() {
       };
 
       rec.onend = () => {
-        try {
-          rec.start();
-        } catch (err) {
-          // Already listening
+        // Only attempt restart if we haven't hit a series of consecutive errors
+        if (errorCount < 3) {
+          setTimeout(() => {
+            try {
+              rec.start();
+            } catch (err) {
+              // Already listening
+            }
+          }, 1000);
+        } else {
+          console.warn("Speech Recognition aborted: too many consecutive errors.");
         }
       };
 
@@ -460,6 +528,8 @@ export default function App() {
     setSwarmStatus("idle");
     setActiveAgentNode("none");
     setPostmortemReport("");
+    setTerminalLines([]);
+    setTerminalActive(false);
 
     fetch("http://localhost:8000/api/simulator/trigger", {
       method: "POST",
@@ -493,8 +563,186 @@ export default function App() {
           }
         ]);
         setActiveAgentNode("none");
+        setTerminalLines([]);
+        setTerminalActive(false);
       })
       .catch(err => console.error("Error resolving incident", err));
+  };
+
+  const getSparklineColors = (key: string, val: number) => {
+    let isAlert = false;
+    if (key === "cpu" && val > 70) isAlert = true;
+    else if (key === "memory" && val > 450) isAlert = true;
+    else if (key === "db_connections" && val >= 90) isAlert = true;
+    else if (key === "latency" && val > 1000) isAlert = true;
+    else if (key === "error_rate" && val > 5) isAlert = true;
+
+    return {
+      stroke: isAlert ? "#ef4444" : "#10b981",
+      fill: isAlert ? "rgba(239, 68, 68, 0.08)" : "rgba(16, 185, 129, 0.04)"
+    };
+  };
+
+  const renderSparkline = (key: string) => {
+    if (metricsHistory.length === 0) return null;
+    const currentVal = metricsHistory[metricsHistory.length - 1]?.[key] || 0;
+    const { stroke, fill } = getSparklineColors(key, currentVal);
+    
+    const points = metricsHistory.map((m, idx) => {
+      const val = m[key] || 0;
+      let maxVal = 100;
+      if (key === "memory") maxVal = 512;
+      else if (key === "db_connections") maxVal = 100;
+      else if (key === "latency") maxVal = 2000;
+      else if (key === "error_rate") maxVal = 100;
+      
+      const x = (idx / 14) * 120;
+      const y = 32 - (val / maxVal) * 28;
+      return `${x},${y}`;
+    });
+
+    const pathData = `M ${points.join(" L ")}`;
+    const areaData = `${pathData} L 120,36 L 0,36 Z`;
+
+    return (
+      <svg className="w-20 h-6 opacity-85 transition-all duration-300" viewBox="0 0 120 36">
+        <path d={areaData} fill={fill} className="transition-all duration-300" />
+        <path d={pathData} fill="none" stroke={stroke} strokeWidth="1.5" className="transition-all duration-300" />
+      </svg>
+    );
+  };
+
+  const triggerSshSimulation = (id: string) => {
+    setTerminalLines(["[SYSTEM] SRE Remediator initializing SSH link...", "Connecting to target microservice host..."]);
+    setTerminalActive(true);
+    
+    const dbCommands = [
+      "ssh root@payment-service.production.svc",
+      "Authorized via SentinelOps cryptokey pair.",
+      "payment-service # psql -h pg-primary -U postgres -d orders",
+      "orders=# SELECT pid, query, state, age(clock_timestamp(), query_start) FROM pg_stat_activity WHERE state != 'idle';",
+      " pid  |               query               | state  |      age       ",
+      "------+-----------------------------------+--------+----------------",
+      " 2041 | SELECT * FROM checkout FOR UPDATE | active | 00:12:45.12321 ",
+      " 2042 | SELECT * FROM checkout FOR UPDATE | active | 00:11:02.45109 ",
+      "orders=# SELECT pg_terminate_backend(2041); pg_terminate_backend(2042);",
+      " pg_terminate_backend \n----------------------\n t\n t\n(2 rows)",
+      "orders=# \\q",
+      "payment-service # git revert a8e92c --no-edit",
+      "[revert-branch a1e9f0] Revert 'Acquire db conn for parallel executor'",
+      "payment-service # docker restart payment-service",
+      "payment-service restarted successfully. Checking health status...",
+      "HTTP/1.1 200 OK - Latency: 12ms. Connections: 2/20 (Nominal)."
+    ];
+
+    const oomCommands = [
+      "ssh root@auth-service.production.svc",
+      "Authorized via SentinelOps cryptokey pair.",
+      "auth-service # pm2 status",
+      "┌────┬─────────────────┬──────────┬────────┬────────┬───────┬────────┐\n│ id │ name            │ mode     │ status │ cpu    │ mem   │ uptime │\n├────┼─────────────────┼──────────┼────────┼────────┼───────┼────────┤\n│ 0  │ auth-service    │ fork     │ errored│ 0%     │ 0 B   │ 0      │\n└────┴─────────────────┴──────────┴────────┴────────┴───────┴────────┘",
+      "auth-service # node --inspect-brk heapdump_trigger.js",
+      "Heapdump captured. Isolating global caches...",
+      "Found: Global AuthTokenCacheMap holding 8,921 keys (unexpiring).",
+      "auth-service # git revert d12b4e --no-edit",
+      "[revert-branch e2c8f1] Revert 'Local session caching enhancement'",
+      "auth-service # pm2 restart auth-service",
+      "auth-service restarted. Memory allocation: 48MB (Nominal)."
+    ];
+
+    const dnsCommands = [
+      "ssh root@api-gateway.production.svc",
+      "Authorized via SentinelOps cryptokey pair.",
+      "api-gateway # nslookup auth-service.production.svc.cluster.local",
+      "Server:         10.96.0.10\nAddress:        10.96.0.10#53\n\n** connection timed out: no servers could be reached",
+      "api-gateway # kubectl rollout restart deployment coredns -n kube-system",
+      "deployment.apps/coredns restarted",
+      "api-gateway # nslookup auth-service.production.svc.cluster.local",
+      "Name:      auth-service.production.svc.cluster.local\nAddress:   10.104.22.82",
+      "api-gateway # nginx -s reload",
+      "Nginx configuration reloaded. Status: 200 OK (Nominal)."
+    ];
+
+    const envCommands = [
+      "ssh root@notification-service.production.svc",
+      "Authorized via SentinelOps cryptokey pair.",
+      "notification-service # python -c \"import os; print(os.environ['SMTP_HOST'])\"",
+      "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"/usr/lib/python3.10/os.py\", line 679, in __getitem__\n    raise KeyError(key) from None\nKeyError: 'SMTP_HOST'",
+      "notification-service # kubectl set env deployment/notification-service SMTP_HOST=smtp.mailgun.org",
+      "deployment.apps/notification-service env updated",
+      "notification-service # kubectl rollout status deployment/notification-service",
+      "Waiting for deployment \"notification-service\" rollout to finish: 1 old replicas are pending termination...",
+      "deployment \"notification-service\" successfully rolled out."
+    ];
+
+    const diskCommands = [
+      "ssh root@audit-logger-service.production.svc",
+      "Authorized via SentinelOps cryptokey pair.",
+      "audit-logger-service # df -h",
+      "Filesystem      Size  Used Avail Use% Mounted on\n/dev/sda1        40G   40G    0B 100% /",
+      "audit-logger-service # find /var/log -type f -size +100M",
+      "/var/log/audit.log",
+      "audit-logger-service # echo \"\" > /var/log/audit.log",
+      "audit-logger-service # sed -i 's/LOG_LEVEL=DEBUG/LOG_LEVEL=INFO/' .env",
+      "audit-logger-service # service syslog restart",
+      "syslog service restarted. Disk usage: 12GB / 40GB (30% Nominal)."
+    ];
+
+    const cmdList = id.includes("DB_CONNECTION") ? dbCommands :
+                    id.includes("NODEJS_HEAPP") ? oomCommands :
+                    id.includes("K8S_DNS") ? dnsCommands :
+                    id.includes("ENV_CONFIG") ? envCommands : diskCommands;
+
+    let index = 0;
+    const interval = setInterval(() => {
+      if (index < cmdList.length) {
+        setTerminalLines(prev => [...prev, cmdList[index]]);
+        index++;
+      } else {
+        setTerminalLines(prev => [...prev, "[SUCCESS] SSH connection terminated. SRE containment complete."]);
+        clearInterval(interval);
+      }
+    }, 900);
+  };
+
+  const handleCreateCustomIncident = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customIncident.id || !customIncident.name || !customIncident.service) {
+      setCustomIncidentStatus("Error: ID, Name, and Service are required.");
+      return;
+    }
+
+    setCustomIncidentStatus("Registering fault...");
+    const logsList = customIncident.logs.split("\n").map(l => l.trim()).filter(Boolean);
+
+    fetch("http://localhost:8000/api/incidents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: customIncident.id.toUpperCase().replace(/[^A-Z0-9_]/g, "_"),
+        name: customIncident.name,
+        severity: customIncident.severity,
+        service: customIncident.service,
+        description: customIncident.description,
+        logs: logsList
+      })
+    })
+      .then(res => {
+        if (!res.ok) throw new Error("Registration failed");
+        return res.json();
+      })
+      .then(data => {
+        setCustomIncidentStatus("Success! Fault scenario active.");
+        setSelectedIncidentId(data.incident_id);
+        setShowCustomConfigurator(false);
+        // Refresh incidents list
+        fetch("http://localhost:8000/api/incidents")
+          .then(res => res.json())
+          .then(data => setIncidents(data));
+      })
+      .catch(err => {
+        console.error(err);
+        setCustomIncidentStatus("Failed to register fault scenario.");
+      });
   };
 
   const handleTriggerSwarm = () => {
@@ -503,6 +751,8 @@ export default function App() {
     setSwarmConversations([]);
     setSwarmStatus("running");
     setPostmortemReport("");
+    setTerminalLines([]);
+    setTerminalActive(false);
     speakText("Swarm agents online. Commencing automated log correlation search.");
     
     const eventSource = new EventSource("http://localhost:8000/api/swarm/analyze");
@@ -530,6 +780,7 @@ export default function App() {
         setPostmortemReport(data.postmortem);
         setActiveAgentNode("none");
         setActiveAgentName("none");
+        triggerSshSimulation(selectedIncidentId);
         
         // Voice summary of solution
         speakText("Diagnostic complete. Swarm root-cause identified and logged in incident postmortem panel.");
@@ -557,6 +808,79 @@ export default function App() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleRagSearch = () => {
+    if (!searchQuery.trim()) return;
+    setIsSearching(true);
+    fetch("http://localhost:8000/api/rag/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: searchQuery, k: 3 })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setSearchResults(data);
+        setIsSearching(false);
+      })
+      .catch(err => {
+        console.error("Error in RAG search", err);
+        setIsSearching(false);
+      });
+  };
+
+  const handleAddRunbook = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRunbook.id || !newRunbook.title || !newRunbook.content) {
+      setRunbookActionStatus("Please fill all required fields");
+      return;
+    }
+    
+    setRunbookActionStatus("Adding runbook...");
+    fetch("http://localhost:8000/api/runbooks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newRunbook)
+    })
+      .then(res => res.json())
+      .then(data => {
+        setRunbooks(data);
+        setNewRunbook({
+          id: "",
+          title: "",
+          category: "Runbook",
+          tags: "",
+          content: ""
+        });
+        setRunbookActionStatus("Runbook added successfully!");
+        setTimeout(() => setRunbookActionStatus(""), 3000);
+      })
+      .catch(err => {
+        console.error("Error adding runbook", err);
+        setRunbookActionStatus("Error adding runbook");
+      });
+  };
+
+  const handleDeleteRunbook = (id: string) => {
+    if (!window.confirm(`Are you sure you want to delete runbook '${id}'? This will remove it from the Swarm's semantic runbook RAG index.`)) return;
+    
+    setRunbookActionStatus("Deleting runbook...");
+    fetch(`http://localhost:8000/api/runbooks/${id}`, {
+      method: "DELETE"
+    })
+      .then(res => res.json())
+      .then(data => {
+        setRunbooks(data.runbooks);
+        if (selectedRunbook?.id === id) {
+          setSelectedRunbook(data.runbooks[0] || null);
+        }
+        setRunbookActionStatus("Runbook deleted.");
+        setTimeout(() => setRunbookActionStatus(""), 3000);
+      })
+      .catch(err => {
+        console.error("Error deleting runbook", err);
+        setRunbookActionStatus("Error deleting runbook");
+      });
+  };
+
   // Get active service metrics helper
   const getActiveServiceMetrics = (): Metric => {
     if (!activeIncident || !metrics) {
@@ -573,7 +897,8 @@ export default function App() {
     { id: "dashboard", label: "OVERVIEW DECK", icon: <Activity /> },
     { id: "agents", label: "AGENT NETWORK", icon: <Network /> },
     { id: "telemetry", label: "TELEMETRY LOGS", icon: <Terminal /> },
-    { id: "postmortem", label: "INCIDENT AUDITS", icon: <FileText /> }
+    { id: "postmortem", label: "INCIDENT AUDITS", icon: <FileText /> },
+    { id: "runbooks", label: "RAG RUNBOOKS", icon: <Database /> }
   ];
 
   return (
@@ -694,19 +1019,103 @@ export default function App() {
             
             <div className="flex flex-col gap-2 relative z-10">
               <label className="text-[11px] text-gray-400 font-mono">Incident Fault Profile</label>
-              <select 
-                value={selectedIncidentId} 
-                onChange={(e) => setSelectedIncidentId(e.target.value)}
-                disabled={activeIncident !== null}
-                className="w-full bg-black/70 border border-white/[0.08] rounded-xl px-3 py-2.5 text-white font-mono text-xs focus:outline-none focus:border-cyber-green transition-colors cursor-pointer"
-              >
-                {incidents.map(inc => (
-                  <option key={inc.id} value={inc.id}>
-                    [{inc.severity}] {inc.name}
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select 
+                  value={selectedIncidentId} 
+                  onChange={(e) => setSelectedIncidentId(e.target.value)}
+                  disabled={activeIncident !== null}
+                  className="flex-grow bg-black/70 border border-white/[0.08] rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-cyber-green transition-colors cursor-pointer"
+                >
+                  {incidents.map(inc => (
+                    <option key={inc.id} value={inc.id}>
+                      [{inc.severity}] {inc.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowCustomConfigurator(!showCustomConfigurator)}
+                  disabled={activeIncident !== null}
+                  className="px-2.5 py-2 bg-white/[0.04] border border-white/[0.08] text-gray-400 hover:text-white rounded-xl font-mono text-[11px] cursor-pointer hover:bg-white/[0.08] transition-colors"
+                  title="Configure custom fault scenario"
+                >
+                  {showCustomConfigurator ? "Cancel" : "New"}
+                </button>
+              </div>
             </div>
+
+            {showCustomConfigurator && (
+              <form onSubmit={handleCreateCustomIncident} className="border-t border-white/[0.04] pt-3 mt-1 flex flex-col gap-2 relative z-10">
+                <p className="text-[10px] text-cyber-green font-mono uppercase tracking-wider font-bold mb-1">Custom Fault Registration</p>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-gray-500 font-mono">FAULT ID</label>
+                    <input 
+                      type="text"
+                      placeholder="CUSTOM_OOM"
+                      value={customIncident.id}
+                      onChange={e => setCustomIncident(prev => ({ ...prev, id: e.target.value }))}
+                      className="bg-black/80 border border-white/[0.08] rounded-lg px-2 py-1 text-white font-mono text-[10px] focus:outline-none focus:border-cyber-green"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-gray-500 font-mono">SERVICE</label>
+                    <input 
+                      type="text"
+                      placeholder="cache-service"
+                      value={customIncident.service}
+                      onChange={e => setCustomIncident(prev => ({ ...prev, service: e.target.value }))}
+                      className="bg-black/80 border border-white/[0.08] rounded-lg px-2 py-1 text-white font-mono text-[10px] focus:outline-none focus:border-cyber-green"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] text-gray-500 font-mono">SCENARIO NAME</label>
+                  <input 
+                    type="text"
+                    placeholder="Redis Out-Of-Memory Outage"
+                    value={customIncident.name}
+                    onChange={e => setCustomIncident(prev => ({ ...prev, name: e.target.value }))}
+                    className="bg-black/80 border border-white/[0.08] rounded-lg px-2 py-1 text-white font-mono text-[10px] focus:outline-none focus:border-cyber-green"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] text-gray-500 font-mono">DESCRIPTION</label>
+                  <textarea 
+                    placeholder="Redis service maxmemory policy exhausted..."
+                    rows={2}
+                    value={customIncident.description}
+                    onChange={e => setCustomIncident(prev => ({ ...prev, description: e.target.value }))}
+                    className="bg-black/80 border border-white/[0.08] rounded-lg px-2 py-1 text-white font-mono text-[10px] focus:outline-none focus:border-cyber-green resize-none"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] text-gray-500 font-mono">DIAGNOSTIC LOG SEQUENCE</label>
+                  <textarea 
+                    placeholder="[ERROR] Redis memory limit reached&#10;[CRITICAL] Cache server failed to respond"
+                    rows={2}
+                    value={customIncident.logs}
+                    onChange={e => setCustomIncident(prev => ({ ...prev, logs: e.target.value }))}
+                    className="bg-black/80 border border-white/[0.08] rounded-lg px-2 py-1 text-white font-mono text-[9px] focus:outline-none focus:border-cyber-green resize-none"
+                  />
+                </div>
+
+                <button 
+                  type="submit"
+                  className="w-full bg-cyber-green/20 hover:bg-cyber-green/30 border border-cyber-green/45 text-cyber-green font-bold py-1.5 rounded-lg font-mono text-[10px] tracking-wide transition-all cursor-pointer mt-1"
+                >
+                  REGISTER & ACTIVATE FAULT
+                </button>
+
+                {customIncidentStatus && (
+                  <p className="text-[9px] font-mono text-center text-cyber-amber animate-pulse mt-0.5">{customIncidentStatus}</p>
+                )}
+              </form>
+            )}
 
             <div className="flex gap-2.5 mt-2 relative z-10">
               <button 
@@ -821,15 +1230,18 @@ export default function App() {
 
             <div className="flex flex-col gap-2 py-1.5 flex-grow justify-between relative z-10 overflow-y-auto">
               {/* CPU Radial Dial */}
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/[0.03] hover:border-white/[0.08] transition-all">
-                <div className="flex items-center gap-2.5">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/[0.03] hover:border-white/[0.08] transition-all gap-2">
+                <div className="flex items-center gap-2.5 min-w-[125px]">
                   <Cpu className="h-4.5 w-4.5 text-cyber-green" />
                   <div>
-                    <p className="text-[11px] font-semibold text-white font-mono">CPU Utilization</p>
-                    <p className="text-[9px] text-gray-500">cgroup scheduler quota</p>
+                    <p className="text-[11px] font-semibold text-white font-mono leading-none">CPU Util</p>
+                    <p className="text-[9px] text-gray-500 mt-1">cgroup quota</p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="flex-grow flex justify-center opacity-70">
+                  {renderSparkline("cpu")}
+                </div>
+                <div className="text-right min-w-[45px]">
                   <p className={cn(
                     "font-mono text-xs font-bold transition-all duration-300",
                     activeMetrics.cpu > 70 ? 'text-cyber-red glow-text-red scale-105 animate-pulse' : 'text-cyber-green'
@@ -840,51 +1252,62 @@ export default function App() {
               </div>
 
               {/* Memory Usage Progress */}
-              <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-black/40 border border-white/[0.03] hover:border-white/[0.08] transition-all">
-                <div className="flex justify-between items-center text-[11px] font-semibold text-white font-mono">
-                  <span className="flex items-center gap-2"><Network className="h-4 w-4 text-cyber-green" /> Heap Allocation</span>
-                  <span className={activeMetrics.memory > 450 ? 'text-cyber-red glow-text-red animate-pulse' : 'text-cyber-green'}>{activeMetrics.memory} MB</span>
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/[0.03] hover:border-white/[0.08] transition-all gap-2">
+                <div className="flex items-center gap-2.5 min-w-[125px]">
+                  <Network className="h-4.5 w-4.5 text-cyber-green" />
+                  <div>
+                    <p className="text-[11px] font-semibold text-white font-mono leading-none">Heap Alloc</p>
+                    <p className="text-[9px] text-gray-500 mt-1">v8 heap limit</p>
+                  </div>
                 </div>
-                <div className="w-full h-2 bg-black rounded-full overflow-hidden border border-white/[0.02]">
-                  <div 
-                    className={cn(
-                      "h-full rounded-full transition-all duration-500",
-                      activeMetrics.memory > 450 ? 'bg-cyber-red' : activeMetrics.memory > 300 ? 'bg-cyber-amber' : 'bg-cyber-green'
-                    )}
-                    style={{ width: `${Math.min(100, (activeMetrics.memory / 512) * 100)}%` }}
-                  ></div>
+                <div className="flex-grow flex justify-center opacity-70">
+                  {renderSparkline("memory")}
+                </div>
+                <div className="text-right min-w-[45px]">
+                  <p className={cn(
+                    "font-mono text-xs font-bold transition-all duration-300",
+                    activeMetrics.memory > 450 ? 'text-cyber-red glow-text-red animate-pulse' : 'text-cyber-green'
+                  )}>
+                    {activeMetrics.memory}M
+                  </p>
                 </div>
               </div>
 
               {/* DB Connections Pool Bar Chart */}
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/[0.03] hover:border-white/[0.08] transition-all">
-                <div className="flex items-center gap-2.5">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/[0.03] hover:border-white/[0.08] transition-all gap-2">
+                <div className="flex items-center gap-2.5 min-w-[125px]">
                   <Database className="h-4.5 w-4.5 text-cyber-green" />
                   <div>
-                    <p className="text-[11px] font-semibold text-white font-mono">Active DB Pools</p>
-                    <p className="text-[9px] text-gray-500">HikariPool allocations</p>
+                    <p className="text-[11px] font-semibold text-white font-mono leading-none">Active DB Pools</p>
+                    <p className="text-[9px] text-gray-500 mt-1">pool capacity</p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="flex-grow flex justify-center opacity-70">
+                  {renderSparkline("db_connections")}
+                </div>
+                <div className="text-right min-w-[45px]">
                   <p className={cn(
                     "font-mono text-xs font-bold transition-all duration-300",
                     activeMetrics.db_connections >= 90 ? 'text-cyber-red glow-text-red animate-pulse' : 'text-cyber-green'
                   )}>
-                    {activeMetrics.db_connections} / 100
+                    {activeMetrics.db_connections}
                   </p>
                 </div>
               </div>
 
               {/* API Response Latency Meter */}
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/[0.03] hover:border-white/[0.08] transition-all">
-                <div className="flex items-center gap-2.5">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/[0.03] hover:border-white/[0.08] transition-all gap-2">
+                <div className="flex items-center gap-2.5 min-w-[125px]">
                   <Clock className="h-4.5 w-4.5 text-cyber-green" />
                   <div>
-                    <p className="text-[11px] font-semibold text-white font-mono">API Latency</p>
-                    <p className="text-[9px] text-gray-500">99th percentile response</p>
+                    <p className="text-[11px] font-semibold text-white font-mono leading-none">API Latency</p>
+                    <p className="text-[9px] text-gray-500 mt-1">p99 response</p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="flex-grow flex justify-center opacity-70">
+                  {renderSparkline("latency")}
+                </div>
+                <div className="text-right min-w-[45px]">
                   <p className={cn(
                     "font-mono text-xs font-bold transition-all duration-300",
                     activeMetrics.latency > 1000 ? 'text-cyber-red glow-text-red animate-pulse' : 'text-cyber-green'
@@ -895,15 +1318,18 @@ export default function App() {
               </div>
 
               {/* Route Error Rate */}
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/[0.03] hover:border-white/[0.08] transition-all">
-                <div className="flex items-center gap-2.5">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-white/[0.03] hover:border-white/[0.08] transition-all gap-2">
+                <div className="flex items-center gap-2.5 min-w-[125px]">
                   <AlertTriangle className="h-4.5 w-4.5 text-cyber-green" />
                   <div>
-                    <p className="text-[11px] font-semibold text-white font-mono">Nginx Error Rate</p>
-                    <p className="text-[9px] text-gray-500">HTTP 5xx status codes</p>
+                    <p className="text-[11px] font-semibold text-white font-mono leading-none">Nginx Error</p>
+                    <p className="text-[9px] text-gray-500 mt-1">HTTP 5xx rate</p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="flex-grow flex justify-center opacity-70">
+                  {renderSparkline("error_rate")}
+                </div>
+                <div className="text-right min-w-[45px]">
                   <p className={cn(
                     "font-mono text-xs font-bold transition-all duration-300",
                     activeMetrics.error_rate > 5.0 ? 'text-cyber-red glow-text-red animate-pulse' : 'text-cyber-green'
@@ -1081,7 +1507,7 @@ export default function App() {
             activeNavIndex === 3 ? "h-full" : "h-1/2"
           )}>
             <Spotlight size={300} />
-            <div className="flex justify-between items-center border-b border-white/[0.04] pb-2 relative z-10">
+            <div className="flex justify-between items-center border-b border-white/[0.04] pb-2 relative z-10 flex-shrink-0">
               <h2 className="text-xs font-semibold tracking-widest text-white flex items-center gap-2 uppercase font-mono">
                 <FileText className="h-4 w-4 text-cyber-green" /> Swarm Postmortem Audit
               </h2>
@@ -1104,55 +1530,326 @@ export default function App() {
               )}
             </div>
 
-            <div className="flex-grow overflow-y-auto code-terminal rounded-xl p-4 font-mono text-[13.5px] text-gray-300 leading-relaxed relative z-10">
-              {postmortemReport ? (
-                <div className="flex flex-col gap-3.5 select-text">
-                  {postmortemReport.split("\n").map((line, idx) => {
-                    if (line.startsWith("# ")) {
-                      return <h1 key={idx} className="text-base font-bold text-white tracking-wide border-b border-white/[0.04] pb-1.5 mt-3">{line.replace("# ", "")}</h1>;
-                    }
-                    if (line.startsWith("## ")) {
-                      return <h2 key={idx} className="text-sm font-bold text-cyber-green mt-4 flex items-center gap-1.5"><ChevronRight className="h-3.5 w-3.5" /> {line.replace("## ", "")}</h2>;
-                    }
-                    if (line.startsWith("### ")) {
-                      return <h3 key={idx} className="text-[13px] font-bold text-emerald-400 mt-3">{line.replace("### ", "")}</h3>;
-                    }
-                    if (line.startsWith("|") && line.includes("---")) {
-                      return null; 
-                    }
-                    if (line.startsWith("|")) {
-                      const cells = line.split("|").map(c => c.trim()).filter(Boolean);
-                      const isHeader = line.includes("Parameter");
-                      return (
-                        <div key={idx} className={cn(
-                          "grid grid-cols-2 p-1.5 border-b border-white/[0.02] font-mono text-[11px]",
-                          isHeader ? 'bg-cyber-green/10 font-bold border-t border-b border-cyber-green/20 text-white rounded-lg' : ''
-                        )}>
-                          <span>{cells[0]}</span>
-                          <span className={cells[1]?.includes("CRITICAL") ? "text-cyber-red font-bold animate-pulse" : cells[1]?.includes("HIGH") ? "text-cyber-amber font-bold" : "text-gray-300"}>{cells[1]}</span>
-                        </div>
-                      );
-                    }
-                    if (line.includes("```python") || line.includes("```javascript") || line.includes("```")) {
-                      return null;
-                    }
-                    if (line.trim().startsWith("-") || line.trim().startsWith("*")) {
-                      return <li key={idx} className="list-none pl-4 relative before:content-['-'] before:absolute before:left-0 before:text-cyber-green font-mono text-[13px]">{line.substring(2)}</li>;
-                    }
-                    return <p key={idx} className="text-gray-300 leading-relaxed font-mono text-[13px]">{line}</p>;
-                  })}
-                </div>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-500 font-mono text-xs">
-                  <FileText className="h-10 w-10 text-gray-800 mb-2 animate-pulse" />
-                  <p className="font-bold text-gray-400">Postmortem report stand-by.</p>
-                  {swarmStatus === "running" ? (
-                    <p className="text-cyber-green mt-1.5 animate-pulse">Postmortem Agent is drafting briefing report...</p>
+            <div className="flex-grow min-h-0 relative z-10 flex flex-col lg:flex-row gap-4">
+              
+              {/* Left Column: Postmortem Report */}
+              <div className={cn(
+                "overflow-y-auto code-terminal rounded-xl p-4 font-mono text-[13px] text-gray-300 leading-relaxed border border-white/[0.02]",
+                activeNavIndex === 3 ? "flex-1" : "w-full"
+              )}>
+                {postmortemReport ? (
+                  <div className="flex flex-col gap-3.5 select-text">
+                    {postmortemReport.split("\n").map((line, idx) => {
+                      if (line.startsWith("# ")) {
+                        return <h1 key={idx} className="text-base font-bold text-white tracking-wide border-b border-white/[0.04] pb-1.5 mt-3">{line.replace("# ", "")}</h1>;
+                      }
+                      if (line.startsWith("## ")) {
+                        return <h2 key={idx} className="text-sm font-bold text-cyber-green mt-4 flex items-center gap-1.5"><ChevronRight className="h-3.5 w-3.5" /> {line.replace("## ", "")}</h2>;
+                      }
+                      if (line.startsWith("### ")) {
+                        return <h3 key={idx} className="text-[13px] font-bold text-emerald-400 mt-3">{line.replace("### ", "")}</h3>;
+                      }
+                      if (line.startsWith("|") && line.includes("---")) {
+                        return null; 
+                      }
+                      if (line.startsWith("|")) {
+                        const cells = line.split("|").map(c => c.trim()).filter(Boolean);
+                        const isHeader = line.includes("Parameter");
+                        return (
+                          <div key={idx} className={cn(
+                            "grid grid-cols-2 p-1.5 border-b border-white/[0.02] font-mono text-[11px]",
+                            isHeader ? 'bg-cyber-green/10 font-bold border-t border-b border-cyber-green/20 text-white rounded-lg' : ''
+                          )}>
+                            <span>{cells[0]}</span>
+                            <span className={cells[1]?.includes("CRITICAL") ? "text-cyber-red font-bold animate-pulse" : cells[1]?.includes("HIGH") ? "text-cyber-amber font-bold" : "text-gray-300"}>{cells[1]}</span>
+                          </div>
+                        );
+                      }
+                      if (line.includes("```python") || line.includes("```javascript") || line.includes("```")) {
+                        return null;
+                      }
+                      if (line.trim().startsWith("-") || line.trim().startsWith("*")) {
+                        return <li key={idx} className="list-none pl-4 relative before:content-['-'] before:absolute before:left-0 before:text-cyber-green font-mono text-[13px]">{line.substring(2)}</li>;
+                      }
+                      return <p key={idx} className="text-gray-300 leading-relaxed font-mono text-[13px]">{line}</p>;
+                    })}
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-500 font-mono text-xs">
+                    <FileText className="h-10 w-10 text-gray-800 mb-2 animate-pulse" />
+                    <p className="font-bold text-gray-400">Postmortem report stand-by.</p>
+                    {swarmStatus === "running" ? (
+                      <p className="text-cyber-green mt-1.5 animate-pulse">Postmortem Agent is drafting briefing report...</p>
+                    ) : (
+                      <p className="text-gray-600 mt-1.5">Deploy the swarm agent network to auto-generate postmortem audits.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column: SRE SSH Terminal Shell */}
+              {activeNavIndex === 3 && (
+                <div className="flex-1 overflow-y-auto code-terminal rounded-xl p-4 font-mono text-[11.5px] bg-black/95 border border-white/[0.04] flex flex-col gap-1.5 select-text">
+                  <div className="flex justify-between items-center border-b border-white/[0.06] pb-1.5 mb-1 flex-shrink-0 text-gray-500 uppercase text-[9px] tracking-wider font-bold">
+                    <span>Remediation Shell Session (root@sre-swarm)</span>
+                    <span className={cn(
+                      "h-2 w-2 rounded-full",
+                      terminalActive ? "bg-cyber-green animate-pulse" : "bg-gray-600"
+                    )} />
+                  </div>
+                  
+                  {terminalActive ? (
+                    <div className="flex flex-col gap-1">
+                      {terminalLines.map((line, lIdx) => {
+                        let textCol = "text-gray-300";
+                        if (line.startsWith("[SYSTEM]") || line.startsWith("[SUCCESS]")) {
+                          textCol = "text-cyber-green font-bold";
+                        } else if (line.includes("Error") || line.includes("errored") || line.includes("KeyError") || line.includes("Traceback") || line.includes("errored")) {
+                          textCol = "text-cyber-red font-semibold";
+                        } else if (line.startsWith("ssh") || line.includes("# ") || line.includes("orders=#") || line.includes("orders=")) {
+                          textCol = "text-cyber-blue font-bold";
+                        }
+                        return (
+                          <div key={lIdx} className={cn("leading-relaxed whitespace-pre-wrap font-mono", textCol)}>
+                            {line}
+                          </div>
+                        );
+                      })}
+                      {terminalLines.length > 0 && terminalLines[terminalLines.length - 1] !== "[SUCCESS] SSH connection terminated. SRE containment complete." && (
+                        <span className="inline-block w-1.5 h-3 bg-cyber-green animate-ping ml-1" />
+                      )}
+                    </div>
                   ) : (
-                    <p className="text-gray-600 mt-1.5">Deploy the swarm agent network to auto-generate postmortem audits.</p>
+                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-600 font-mono text-xs">
+                      <Terminal className="h-8 w-8 text-gray-800 mb-1.5" />
+                      <p className="font-bold text-gray-500">Remediation Shell Stand-by.</p>
+                      <p className="text-gray-700 mt-1">Awaiting Remediator node trigger execution.</p>
+                    </div>
                   )}
                 </div>
               )}
+
+            </div>
+          </div>
+        </section>
+
+        {/* ==================== RAG RUNBOOKS DATABASE PANEL ==================== */}
+        <section className={cn(
+          "grid grid-cols-1 lg:grid-cols-12 gap-4 transition-all duration-300 h-full min-h-0 overflow-hidden lg:col-span-12",
+          activeNavIndex === 4 ? "flex" : "hidden"
+        )}>
+          {/* Left Column: Playground & Form (Col-span 5) */}
+          <div className="lg:col-span-5 flex flex-col gap-4 h-full min-h-0">
+            
+            {/* RAG Similarity Search Playground */}
+            <div className="glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden flex-shrink-0">
+              <Spotlight size={250} />
+              <h2 className="text-xs font-semibold tracking-widest text-white border-b border-white/[0.04] pb-2 flex items-center gap-2 uppercase font-mono relative z-10">
+                <Database className="h-4 w-4 text-cyber-green animate-pulse" /> Semantic Search Playground
+              </h2>
+              
+              <div className="flex gap-2 relative z-10">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Enter telemetry symptoms or tags..."
+                  className="flex-1 bg-black/70 border border-white/[0.08] rounded-xl px-3 py-2.5 text-white font-mono text-xs focus:outline-none focus:border-cyber-green transition-colors"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleRagSearch();
+                  }}
+                />
+                <button
+                  onClick={handleRagSearch}
+                  disabled={isSearching}
+                  className="bg-cyber-green hover:bg-emerald-600 text-white font-bold py-2.5 px-4 rounded-xl transition-all font-mono text-xs cursor-pointer active:scale-95 border-none flex items-center gap-1.5"
+                >
+                  <Search className="h-3.5 w-3.5" /> {isSearching ? "Searching..." : "QUERY"}
+                </button>
+              </div>
+
+              {/* Search Results */}
+              <div className="flex flex-col gap-2 relative z-10 max-h-[180px] overflow-y-auto pr-1">
+                {searchResults.length === 0 ? (
+                  <p className="text-[11px] text-gray-500 font-mono text-center py-2">
+                    {searchQuery ? "No matching documents found." : "Submit query to test TF-IDF cosine similarity calculations."}
+                  </p>
+                ) : (
+                  searchResults.map((res, index) => (
+                    <div 
+                      key={index} 
+                      onClick={() => setSelectedRunbook(res.doc)}
+                      className="p-2.5 rounded-xl bg-black/40 border border-white/[0.03] hover:border-cyber-green/40 hover:bg-black/60 transition-all cursor-pointer flex flex-col gap-1.5"
+                    >
+                      <div className="flex justify-between items-center text-[11px] font-mono">
+                        <span className="font-bold text-white truncate max-w-[220px]">{res.doc.title}</span>
+                        <span className="text-cyber-green font-bold bg-cyber-green/10 border border-cyber-green/25 px-1.5 py-0.5 rounded text-[9px]">
+                          {(res.score * 100).toFixed(1)}% Match
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-gray-400 line-clamp-2 leading-relaxed">
+                        {res.doc.content}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Create New Runbook Form */}
+            <div className="glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden flex-grow min-h-0">
+              <Spotlight size={300} />
+              <h2 className="text-xs font-semibold tracking-widest text-white border-b border-white/[0.04] pb-2 flex items-center gap-2 uppercase font-mono relative z-10">
+                <FileText className="h-4 w-4 text-cyber-green" /> Register New Knowledge Item
+              </h2>
+              
+              <form onSubmit={handleAddRunbook} className="flex flex-col gap-2.5 relative z-10 flex-grow overflow-y-auto pr-1">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-gray-400 font-mono uppercase tracking-wider">Document ID *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. RUNBOOK_REDIS_LEAK"
+                      value={newRunbook.id}
+                      onChange={(e) => setNewRunbook({...newRunbook, id: e.target.value})}
+                      className="w-full bg-black/60 border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-white font-mono text-[11px] focus:outline-none focus:border-cyber-green transition-colors"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-gray-400 font-mono uppercase tracking-wider">Category</label>
+                    <select
+                      value={newRunbook.category}
+                      onChange={(e) => setNewRunbook({...newRunbook, category: e.target.value})}
+                      className="w-full bg-black/60 border border-white/[0.08] rounded-lg px-2 py-1.5 text-white font-mono text-[11px] focus:outline-none focus:border-cyber-green transition-colors cursor-pointer"
+                    >
+                      <option value="Runbook">Runbook</option>
+                      <option value="Historical Incident">Historical Incident</option>
+                      <option value="Cheat Sheet">Cheat Sheet</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] text-gray-400 font-mono uppercase tracking-wider">Document Title *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Troubleshooting Redis Timeout and Latency Spikes"
+                    value={newRunbook.title}
+                    onChange={(e) => setNewRunbook({...newRunbook, title: e.target.value})}
+                    className="w-full bg-black/60 border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-white font-mono text-[11px] focus:outline-none focus:border-cyber-green transition-colors"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] text-gray-400 font-mono uppercase tracking-wider">Search Keywords / Tags</label>
+                  <input
+                    type="text"
+                    placeholder="redis, cache, timeout, network (comma-separated)"
+                    value={newRunbook.tags}
+                    onChange={(e) => setNewRunbook({...newRunbook, tags: e.target.value})}
+                    className="w-full bg-black/60 border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-white font-mono text-[11px] focus:outline-none focus:border-cyber-green transition-colors"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1 flex-grow">
+                  <label className="text-[9px] text-gray-400 font-mono uppercase tracking-wider">Resolution Guidelines / Content *</label>
+                  <textarea
+                    required
+                    placeholder="Detailed troubleshooting rules and steps. These will be semantically indexed for LangGraph agents..."
+                    value={newRunbook.content}
+                    onChange={(e) => setNewRunbook({...newRunbook, content: e.target.value})}
+                    rows={4}
+                    className="w-full bg-black/60 border border-white/[0.08] rounded-lg p-2.5 text-white font-mono text-[11px] focus:outline-none focus:border-cyber-green transition-colors resize-none flex-grow min-h-[60px]"
+                  />
+                </div>
+
+                <div className="flex justify-between items-center mt-1 flex-shrink-0">
+                  <span className="text-[10px] text-cyber-amber font-mono">{runbookActionStatus}</span>
+                  <button
+                    type="submit"
+                    className="bg-cyber-green hover:bg-emerald-600 text-white font-bold py-1.5 px-4 rounded-xl transition-all font-mono text-xs cursor-pointer active:scale-95 border-none"
+                  >
+                    ADD TO RAG INDEX
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          {/* Right Column: Catalog List & Detail Panel (Col-span 7) */}
+          <div className="lg:col-span-7 flex flex-col gap-4 h-full min-h-0">
+            
+            {/* Runbook Index Directory */}
+            <div className="glass-panel threat-glow rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden h-full min-h-0">
+              <Spotlight size={350} />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full min-h-0">
+                {/* Runbooks Directory List */}
+                <div className="flex flex-col gap-2.5 border-r border-white/[0.04] pr-2 h-full overflow-y-auto">
+                  <h3 className="text-[10px] font-bold text-gray-500 font-mono uppercase tracking-wider mb-0.5">SRE Runbooks Index</h3>
+                  {runbooks.map((rb) => (
+                    <div
+                      key={rb.id}
+                      onClick={() => setSelectedRunbook(rb)}
+                      className={cn(
+                        "p-2.5 rounded-xl border transition-all cursor-pointer relative group flex flex-col gap-1.5",
+                        selectedRunbook?.id === rb.id
+                          ? "bg-cyber-green/5 border-cyber-green/50 text-white"
+                          : "bg-black/40 border-white/[0.03] text-gray-400 hover:border-white/[0.08] hover:bg-black/60"
+                      )}
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className="font-bold text-[11px] font-mono tracking-wide truncate max-w-[150px]">{rb.title}</span>
+                        <span className="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded bg-black/60 border border-white/[0.04] text-gray-500">
+                          {rb.category}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {rb.tags?.map((t: string) => (
+                          <span key={t} className="text-[8px] font-mono px-1 py-0.2 rounded bg-white/[0.02] border border-white/[0.04] text-gray-500">
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Selected Runbook Detailed Reader */}
+                <div className="flex flex-col h-full min-h-0 overflow-hidden pl-1">
+                  {selectedRunbook ? (
+                    <div className="flex flex-col h-full min-h-0">
+                      <div className="flex justify-between items-start border-b border-white/[0.04] pb-2 mb-2 flex-shrink-0">
+                        <div>
+                          <span className="text-[8px] font-mono text-cyber-green font-bold uppercase tracking-wider block">{selectedRunbook.category} ID: {selectedRunbook.id}</span>
+                          <h4 className="text-xs font-bold text-white font-mono leading-tight mt-0.5">{selectedRunbook.title}</h4>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteRunbook(selectedRunbook.id)}
+                          className="text-[9px] font-mono font-semibold px-2 py-1 rounded bg-cyber-red/10 hover:bg-cyber-red/20 border border-cyber-red/35 text-cyber-red transition-all cursor-pointer"
+                        >
+                          DELETE
+                        </button>
+                      </div>
+
+                      <div className="flex-grow overflow-y-auto pr-1 text-[11px] font-mono leading-relaxed text-gray-400 whitespace-pre-wrap select-text">
+                        {selectedRunbook.content}
+                      </div>
+                      
+                      <div className="mt-3 p-2 bg-white/[0.01] rounded-xl border border-white/[0.02] text-[9.5px] text-gray-500 leading-normal flex-shrink-0">
+                        <span className="font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Indexing specs:</span>
+                        This node is mapped into the SRE TF-IDF corpus. When the LangGraph swarm's RCA confidence falls below 80%, this runbook is queried and loaded as raw context to remediate failures.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-center text-gray-600 font-mono text-[10px]">
+                      Select a runbook to review semantic details.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </section>

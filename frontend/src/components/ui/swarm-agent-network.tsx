@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Cpu, Database, Zap, Compass, Activity } from "lucide-react";
+import { Cpu, Database, Zap, Compass, Activity, Terminal, Shield, BarChart2 } from "lucide-react";
 
 interface AgentNode {
   id: string;
@@ -13,9 +13,15 @@ interface AgentNode {
   icon: React.ComponentType<any>;
   x: number;
   y: number;
+  // Prompt Inspector fields
+  model: string;
+  temperature: number;
+  promptTemplate: string;
+  estTokens: string;
+  estCost: string;
 }
 
-export const SwarmAgentNetwork: React.FC<{ isThreat?: boolean; activeAgentName?: string }> = ({ 
+export const SwarmAgentNetwork: React.FC<{ isThreat?: boolean; activeAgentName?: string }> = ({
   isThreat = false,
   activeAgentName = "none"
 }) => {
@@ -28,6 +34,25 @@ export const SwarmAgentNetwork: React.FC<{ isThreat?: boolean; activeAgentName?:
     if (nodeId === "rca" && (nameLower.includes("root cause") || nameLower.includes("rca"))) return true;
     if (nodeId === "remediator" && (nameLower.includes("remed") || nameLower.includes("postmortem") || nameLower.includes("resolution"))) return true;
     if (nodeId === "rag" && (nameLower.includes("rag") || nameLower.includes("retriev") || nameLower.includes("memory"))) return true;
+    return false;
+  };
+
+  const isConnectionActive = (from: string, to: string): boolean => {
+    if (activeAgentName === "none" || !isThreat) return false;
+    const nameLower = activeAgentName.toLowerCase();
+
+    if (nameLower.includes("detection") || nameLower.includes("telemetry")) {
+      return (from === "orchestrator" && to === "telemetry") || (from === "telemetry" && to === "rca");
+    }
+    if (nameLower.includes("rca") || nameLower.includes("root cause")) {
+      return (from === "telemetry" && to === "rca") || (from === "rag" && to === "rca");
+    }
+    if (nameLower.includes("rag") || nameLower.includes("retrieval") || nameLower.includes("memory")) {
+      return (from === "orchestrator" && to === "rag") || (from === "rag" && to === "rca");
+    }
+    if (nameLower.includes("remed") || nameLower.includes("postmortem") || nameLower.includes("resolution")) {
+      return (from === "rca" && to === "remediator") || (from === "remediator" && to === "orchestrator");
+    }
     return false;
   };
 
@@ -55,6 +80,11 @@ export const SwarmAgentNetwork: React.FC<{ isThreat?: boolean; activeAgentName?:
       icon: Compass,
       x: 250,
       y: 40,
+      model: "gemini-1.5-flash",
+      temperature: 0.1,
+      promptTemplate: "SYSTEM: Act as the orchestrator of an SRE swarm. Parse the incoming service telemetry alerts, assign tasks to Detection and RCA agents, compile reports...",
+      estTokens: "1,250 in / 320 out",
+      estCost: "$0.00019"
     },
     {
       id: "telemetry",
@@ -67,6 +97,11 @@ export const SwarmAgentNetwork: React.FC<{ isThreat?: boolean; activeAgentName?:
       icon: Activity,
       x: 410,
       y: 110,
+      model: "gemini-1.5-flash",
+      temperature: 0.0,
+      promptTemplate: "SYSTEM: Analyze the dynamic logging stream and cluster resource limits. Isolate the anomalous service and compute CPU/memory regression metrics...",
+      estTokens: "2,100 in / 150 out",
+      estCost: "$0.00021"
     },
     {
       id: "rca",
@@ -79,6 +114,11 @@ export const SwarmAgentNetwork: React.FC<{ isThreat?: boolean; activeAgentName?:
       icon: Cpu,
       x: 350,
       y: 220,
+      model: "gemini-1.5-flash",
+      temperature: 0.2,
+      promptTemplate: "SYSTEM: Compare the anomaly logs with the git commit history. Determine the root cause of the connection leak or heap crash. If confidence is low (<0.8), route to RAG Memory Node...",
+      estTokens: "3,500 in / 450 out",
+      estCost: "$0.00035"
     },
     {
       id: "remediator",
@@ -91,6 +131,11 @@ export const SwarmAgentNetwork: React.FC<{ isThreat?: boolean; activeAgentName?:
       icon: Zap,
       x: 150,
       y: 220,
+      model: "gemini-1.5-flash",
+      temperature: 0.3,
+      promptTemplate: "SYSTEM: Draft an SRE remediation postmortem report in clear Markdown. Define immediate mitigation commands (Docker restart, Git revert) and permanent code fixes...",
+      estTokens: "4,200 in / 980 out",
+      estCost: "$0.00062"
     },
     {
       id: "rag",
@@ -103,6 +148,11 @@ export const SwarmAgentNetwork: React.FC<{ isThreat?: boolean; activeAgentName?:
       icon: Database,
       x: 90,
       y: 110,
+      model: "Local TF-IDF Vector Store",
+      temperature: 0.0,
+      promptTemplate: "SYSTEM: Receive SRE queries. Run cosine similarity index search on the runbooks database. Retrieve relevant troubleshooting playbooks...",
+      estTokens: "800 in / 400 out",
+      estCost: "$0.00000 (Local Compute)"
     },
   ];
 
@@ -119,10 +169,10 @@ export const SwarmAgentNetwork: React.FC<{ isThreat?: boolean; activeAgentName?:
 
   return (
     <div className="w-full h-full grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch min-h-[300px]">
-      
+
       {/* Interactive Topology Graph Map */}
       <div className="md:col-span-8 relative border border-white/[0.04] bg-black/40 rounded-xl overflow-hidden min-h-[250px] flex items-center justify-center">
-        
+
         {/* Animated grid radar rings */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-64 h-64 border border-white/[0.02] rounded-full animate-ping [animation-duration:8s]"></div>
@@ -145,6 +195,8 @@ export const SwarmAgentNetwork: React.FC<{ isThreat?: boolean; activeAgentName?:
           {connections.map((conn, idx) => {
             const fromNode = nodes.find((n) => n.id === conn.from)!;
             const toNode = nodes.find((n) => n.id === conn.to)!;
+            const isConnActive = isConnectionActive(conn.from, conn.to);
+
             return (
               <g key={idx}>
                 {/* Background Shadow Line */}
@@ -153,9 +205,13 @@ export const SwarmAgentNetwork: React.FC<{ isThreat?: boolean; activeAgentName?:
                   y1={fromNode.y}
                   x2={toNode.x}
                   y2={toNode.y}
-                  stroke="var(--threat-border)"
-                  strokeWidth="1"
-                  strokeOpacity="0.3"
+                  stroke={isConnActive ? "var(--threat-primary)" : "var(--threat-border)"}
+                  strokeWidth={isConnActive ? "2.5" : "1"}
+                  strokeOpacity={isConnActive ? "0.8" : "0.3"}
+                  className="transition-all duration-300"
+                  style={{
+                    filter: isConnActive ? "drop-shadow(0 0 4px var(--threat-primary))" : "none"
+                  }}
                 />
                 {/* Active Flow Line */}
                 <line
@@ -169,9 +225,13 @@ export const SwarmAgentNetwork: React.FC<{ isThreat?: boolean; activeAgentName?:
                   className="animate-[neonGridMove_10s_linear_infinite]"
                 />
                 {/* Floating data packets */}
-                <circle r="2.5" fill="var(--threat-primary)" filter="url(#glow)">
+                <circle
+                  r={isConnActive ? "4" : "2.5"}
+                  fill={isConnActive ? "var(--cyber-blue)" : "var(--threat-primary)"}
+                  filter="url(#glow)"
+                >
                   <animateMotion
-                    dur={`${3 + (idx % 3)}s`}
+                    dur={isConnActive ? "1.0s" : `${3 + (idx % 3)}s`}
                     repeatCount="indefinite"
                     path={`M ${fromNode.x} ${fromNode.y} L ${toNode.x} ${toNode.y}`}
                   />
@@ -211,8 +271,8 @@ export const SwarmAgentNetwork: React.FC<{ isThreat?: boolean; activeAgentName?:
               currentStatus === "error"
                 ? "var(--cyber-red)"
                 : currentStatus === "active"
-                ? "var(--cyber-blue)"
-                : "var(--threat-primary)";
+                  ? "var(--cyber-blue)"
+                  : "var(--threat-primary)";
 
             return (
               <g
@@ -263,39 +323,38 @@ export const SwarmAgentNetwork: React.FC<{ isThreat?: boolean; activeAgentName?:
             );
           })}
         </svg>
-        
+
         <div className="absolute top-3 left-3 bg-[#050508]/80 border border-white/[0.04] rounded-lg px-2 py-1 font-mono text-[9px] text-gray-500 uppercase tracking-widest pointer-events-none select-none">
           Swarm Plexus Grid
         </div>
       </div>
 
-      {/* Selected Agent Metrics Telemetry Sidebar */}
-      <div className="md:col-span-4 flex flex-col justify-between p-3 border border-white/[0.04] bg-black/60 rounded-xl font-mono text-xs">
-        <div className="flex flex-col gap-2">
-          <div className="flex justify-between items-start border-b border-white/[0.04] pb-1.5">
-            <div>
-              <span className="text-[10px] text-gray-500 block uppercase tracking-wider">Active Thread</span>
-              <h3 className="font-bold text-white tracking-wide text-[12.5px]">{activeNode.name}</h3>
-            </div>
-            <span className={cn(
-              "px-2 py-0.5 rounded-lg text-[9px] font-bold border uppercase tracking-wider",
-              activeNode.status === "error" ? "bg-cyber-red/10 border-cyber-red/35 text-cyber-red" :
-              activeNode.status === "active" ? "bg-cyber-blue/10 border-cyber-blue/20 text-cyber-blue" :
-              "bg-cyber-green/10 border-cyber-green/20 text-cyber-green"
-            )}>
-              {activeNode.status}
-            </span>
+      {/* Selected Agent Metrics Telemetry Sidebar & LLMOps Inspector */}
+      <div className="md:col-span-4 flex flex-col p-3 border border-white/[0.04] bg-black/60 rounded-xl font-mono text-xs overflow-y-auto max-h-[300px] md:max-h-none">
+
+        {/* Header Node Info */}
+        <div className="flex justify-between items-start border-b border-white/[0.04] pb-1.5 flex-shrink-0">
+          <div>
+            <span className="text-[10px] text-gray-500 block uppercase tracking-wider">Active Thread</span>
+            <h3 className="font-bold text-white tracking-wide text-[12.5px]">{activeNode.name}</h3>
           </div>
-          <span className="text-[10.5px] text-gray-400 italic font-mono leading-relaxed mt-1 block">
-            "{activeNode.role}"
+          <span className={cn(
+            "px-2 py-0.5 rounded-lg text-[9px] font-bold border uppercase tracking-wider",
+            activeNode.status === "error" ? "bg-cyber-red/10 border-cyber-red/35 text-cyber-red" :
+              activeNode.status === "active" ? "bg-cyber-blue/10 border-cyber-blue/20 text-cyber-blue" :
+                "bg-cyber-green/10 border-cyber-green/20 text-cyber-green"
+          )}>
+            {activeNode.status}
           </span>
-          <p className="text-[11px] text-gray-400 leading-relaxed font-mono mt-1.5">
-            {activeNode.details}
-          </p>
         </div>
 
-        <div className="flex flex-col gap-2.5 mt-3 pt-2 border-t border-white/[0.04]">
-          <div className="grid grid-cols-2 gap-2 text-[10.5px]">
+        {/* Node Specs */}
+        <div className="flex flex-col gap-2 mt-2 flex-grow overflow-y-auto pr-1">
+          <p className="text-[11px] text-gray-400 leading-relaxed font-mono">
+            {activeNode.details}
+          </p>
+
+          <div className="grid grid-cols-2 gap-2 text-[10.5px] mt-1">
             <div className="bg-white/[0.01] border border-white/[0.02] p-1.5 rounded-lg">
               <span className="text-gray-500 block text-[8px] uppercase">Node CPU Load</span>
               <strong className="text-white block font-bold text-[11px] mt-0.5">{activeNode.cpu}</strong>
@@ -305,9 +364,32 @@ export const SwarmAgentNetwork: React.FC<{ isThreat?: boolean; activeAgentName?:
               <strong className="text-white block font-bold text-[11px] mt-0.5">{activeNode.memory}</strong>
             </div>
           </div>
-          <div className="text-[9.5px] text-gray-500 text-center italic bg-white/[0.01] p-1.5 rounded-lg border border-white/[0.02]">
-            Click node in graph map to inspect thread metrics.
+
+          {/* Prompt Template & LLMOps stats */}
+          <div className="border-t border-white/[0.04] pt-2 mt-2 flex flex-col gap-2">
+            <div className="flex justify-between items-center text-[10px]">
+              <span className="text-gray-500 uppercase flex items-center gap-1"><Shield className="h-3 w-3 text-cyber-blue" /> MODEL ENGINE</span>
+              <span className="text-white font-bold bg-white/[0.04] px-1.5 py-0.5 rounded text-[9px]">{activeNode.model}</span>
+            </div>
+
+            <div className="flex justify-between items-center text-[10px]">
+              <span className="text-gray-500 uppercase flex items-center gap-1"><BarChart2 className="h-3 w-3 text-cyber-green" /> TOKENS / COST</span>
+              <span className="text-cyber-green font-bold text-[9px]">{activeNode.estCost}</span>
+            </div>
+
+            <div className="bg-black/85 p-2 rounded-lg border border-white/[0.04] flex flex-col gap-1">
+              <span className="text-gray-500 text-[8px] uppercase tracking-wider font-bold flex items-center gap-1">
+                <Terminal className="h-2.5 w-2.5" /> AGENT PROMPT CONTEXT
+              </span>
+              <p className="text-[10px] text-gray-400 font-mono leading-relaxed line-clamp-3 select-text hover:line-clamp-none transition-all duration-300 cursor-pointer">
+                {activeNode.promptTemplate}
+              </p>
+            </div>
           </div>
+        </div>
+
+        <div className="text-[9px] text-gray-600 text-center italic bg-white/[0.01] p-1.5 rounded-lg border border-white/[0.02] mt-3 flex-shrink-0">
+          Click node in plexus grid map to inspect system prompts.
         </div>
 
       </div>

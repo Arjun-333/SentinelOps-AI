@@ -155,3 +155,61 @@ class LocalVectorStore:
         # Sort by similarity score descending
         results.sort(key=lambda x: x[0], reverse=True)
         return [doc for score, doc in results[:k]]
+
+    def similarity_search_with_scores(self, query: str, k: int = 2) -> List[Tuple[float, Dict[str, Any]]]:
+        if not self.documents or not query:
+            return []
+
+        # Tokenize query
+        query_tokens = self._tokenize(query)
+        query_counts = {}
+        for t in query_tokens:
+            if t in self.vocab:
+                query_counts[t] = query_counts.get(t, 0) + 1
+
+        # Build query TF-IDF vector
+        query_vector = {}
+        length_sq = 0.0
+        for term, count in query_counts.items():
+            term_idx = self.vocab[term]
+            tf = count
+            tfidf = tf * self.idf[term]
+            query_vector[term_idx] = tfidf
+            length_sq += tfidf ** 2
+        
+        query_length = math.sqrt(length_sq)
+        if query_length == 0:
+            # Fallback to string containment keyword match
+            matches = []
+            for doc in self.documents:
+                score = 0.0
+                content_lower = doc["content"].lower()
+                title_lower = doc["title"].lower()
+                for token in query_tokens:
+                    if token in title_lower:
+                        score += 3.0
+                    elif token in content_lower:
+                        score += 1.0
+                if score > 0:
+                    norm_score = min(0.95, score / 10.0)
+                    matches.append((norm_score, doc))
+            matches.sort(key=lambda x: x[0], reverse=True)
+            return matches[:k]
+
+        normalized_query_vector = {idx: val / query_length for idx, val in query_vector.items()}
+
+        # Compute cosine similarity
+        results: List[Tuple[float, Dict[str, Any]]] = []
+        for doc_idx, doc_vector in enumerate(self.doc_vectors):
+            similarity = 0.0
+            for term_idx, query_val in normalized_query_vector.items():
+                if term_idx in doc_vector:
+                    similarity += query_val * doc_vector[term_idx]
+            
+            if similarity > 0:
+                results.append((similarity, self.documents[doc_idx]))
+
+        # Sort by similarity score descending
+        results.sort(key=lambda x: x[0], reverse=True)
+        return results[:k]
+
